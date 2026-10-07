@@ -48,8 +48,7 @@ export function ProjectScreen({ id }: { id: string }) {
         />
       </div>
       <h3>Задачи</h3>
-      <AddItem label="Новая задача" onAdd={(t) => s.addTask(p.id, t)} />
-      <TaskList owner={p.id} />
+      <TaskList owner={p.id} afterOpen={<AddItem label="Новая задача" onAdd={(t) => s.addTask(p.id, t)} />} />
       <h3>Рутина</h3>
       <AddItem label="Новая рутина" withInterval onAdd={(t, _, interval) => s.addRoutine(p.id, t, null, interval)} />
       <RoutineList owner={p.id} />

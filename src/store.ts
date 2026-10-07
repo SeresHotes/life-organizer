@@ -266,7 +266,13 @@ export const useStore = create<State>()(
         },
 
         addTask: (owner, text, sphereId = null) =>
-          editList('tasks', owner, (l) => [{ id: uid(), text, done: false, sphereId }, ...l]),
+          editList('tasks', owner, (l) => {
+            const task = { id: uid(), text, done: false, sphereId }
+            if (owner === null) return [task, ...l]
+            // in a project tasks go in plan order: a new one goes after the last open task
+            const open = l.filter((t) => !t.done)
+            return [...open, task, ...l.filter((t) => t.done)]
+          }),
         updateTask: (owner, id, patch) =>
           editList('tasks', owner, (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t))),
         deleteTask: (owner, id) => editList('tasks', owner, (l) => l.filter((t) => t.id !== id)),

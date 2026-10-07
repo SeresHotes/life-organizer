@@ -56,7 +56,12 @@ export function RoutineRow({ owner, routine: r, badge }: { owner: Owner; routine
 }
 
 /** Open tasks first, then closed ones; each part is sortable on its own. */
-export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProps<Task>) {
+export function TaskList({
+  owner = null,
+  filter = pass,
+  show = 'all',
+  afterOpen,
+}: ListProps<Task> & { afterOpen?: ReactNode }) {
   const s = useStore()
   const all = owner === null ? s.tasks : (s.projects.find((p) => p.id === owner)?.tasks ?? [])
   const tasks = all.filter(filter)
@@ -72,6 +77,7 @@ export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProp
   return (
     <>
       {show !== 'done' && part(open, false)}
+      {afterOpen}
       {show === 'all' && done.length > 0 && <div className="divider">Выполнено · {done.length}</div>}
       {show !== 'open' && part(done, true)}
     </>
