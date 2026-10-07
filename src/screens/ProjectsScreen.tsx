@@ -114,15 +114,20 @@ export function ProjectsScreen() {
                 status={st.id}
                 title={st.title}
                 items={items}
-                add={(close) => (
-                  <AddForm
-                    label="Новый проект"
-                    withSphere
-                    defaultSphere={filter}
-                    onAdd={(t, sp) => addProject(t, st.id, sp)}
-                    onClose={close}
-                  />
-                )}
+                // new projects always start in "Открытые"
+                add={
+                  st.id === 'open'
+                    ? (close) => (
+                        <AddForm
+                          label="Новый проект"
+                          withSphere
+                          defaultSphere={filter}
+                          onAdd={(t, sp) => addProject(t, st.id, sp)}
+                          onClose={close}
+                        />
+                      )
+                    : undefined
+                }
               >
                 {st.id === 'done' && archived.length > 0 && (
                   <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
@@ -177,7 +182,7 @@ function Column({
   status: Status
   title: string
   items: Project[]
-  add: (close: () => void) => React.ReactNode
+  add?: (close: () => void) => React.ReactNode
   children?: React.ReactNode
 }) {
   const { setNodeRef } = useDroppable({ id: status })
@@ -187,12 +192,14 @@ function Column({
       <div className="column-head">
         <span>{title}</span>
         <span className="count">{items.length}</span>
-        <button className="add-icon small" aria-label="Новый проект" onClick={() => setAdding(true)}>
-          +
-        </button>
+        {add && (
+          <button className="add-icon small" aria-label="Новый проект" onClick={() => setAdding(true)}>
+            +
+          </button>
+        )}
       </div>
       <div className="column-body" ref={setNodeRef}>
-        {adding && add(() => setAdding(false))}
+        {adding && add?.(() => setAdding(false))}
         <SortableContext items={items.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           {items.map((p) => (
             <SortableCard key={p.id} project={p} />
