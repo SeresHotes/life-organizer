@@ -246,7 +246,9 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   scroll-snap-align: start;
   min-height: 0;
 }
-.column-head { display: flex; justify-content: space-between; padding: 10px 12px; font-weight: 600; }
+.column-head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; font-weight: 600; min-height: 40px; }
+.column-head .count { flex: 1; }
+.add-icon.small { width: 28px; height: 28px; margin-right: 0; font-size: 1.15rem; }
 .column-body { flex: 1; min-height: 60px; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 6px; }
 .card {
   background: var(--panel-2);
@@ -335,3 +337,10 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
 /* scroll snapping fights auto-scroll while a card is dragged */
 .board.is-dragging { scroll-snap-type: none; }
 .link-btn.inline { padding: 0; font-size: inherit; }
+
+/* portrait screens: status columns stacked vertically, the whole board scrolls down */
+@media (orientation: portrait) and (max-width: 899px) {
+  .board { flex-direction: column; overflow-x: hidden; overflow-y: auto; scroll-snap-type: none; }
+  .column { flex: none; width: 100%; }
+  .column-body { flex: none; overflow: visible; min-height: 0; }
+}

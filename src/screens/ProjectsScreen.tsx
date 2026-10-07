@@ -13,11 +13,11 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { STATUSES, isArchived, useStore, type Project, type Status } from '../store'
 import { navigate } from '../hooks'
-import { AddItem } from '../components/AddItem'
+import { AddForm } from '../components/AddItem'
 import { useItemSensors, vibrate } from '../components/SortableList'
 
-/** Gentle auto-scroll: only very close to the edge and slowly (defaults are 20% of the width and 10x speed). */
-const AUTO_SCROLL = { threshold: { x: 0.08, y: 0.1 }, acceleration: 2 }
+/** Auto-scroll only near the edge, at moderate speed (defaults: 20% of the size, acceleration 10). */
+const AUTO_SCROLL = { threshold: { x: 0.1, y: 0.12 }, acceleration: 6 }
 
 const isStatus = (id: unknown): id is Status => STATUSES.some((s) => s.id === id)
 
@@ -109,8 +109,21 @@ export function ProjectsScreen() {
           {STATUSES.map((st) => {
             const items = list.filter((p) => p.status === st.id && visible(p))
             return (
-              <Column key={st.id} status={st.id} title={st.title} items={items}>
-                <AddItem label="Проект" withSphere defaultSphere={filter} onAdd={(t, sp) => addProject(t, st.id, sp)} />
+              <Column
+                key={st.id}
+                status={st.id}
+                title={st.title}
+                items={items}
+                add={(close) => (
+                  <AddForm
+                    label="Новый проект"
+                    withSphere
+                    defaultSphere={filter}
+                    onAdd={(t, sp) => addProject(t, st.id, sp)}
+                    onClose={close}
+                  />
+                )}
+              >
                 {st.id === 'done' && archived.length > 0 && (
                   <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
                     {showArchive ? 'Скрыть архив' : `Архив · ${archived.length}`}
@@ -158,21 +171,28 @@ function Column({
   status,
   title,
   items,
+  add,
   children,
 }: {
   status: Status
   title: string
   items: Project[]
+  add: (close: () => void) => React.ReactNode
   children?: React.ReactNode
 }) {
   const { setNodeRef } = useDroppable({ id: status })
+  const [adding, setAdding] = useState(false)
   return (
     <div className="column">
       <div className="column-head">
         <span>{title}</span>
         <span className="count">{items.length}</span>
+        <button className="add-icon small" aria-label="Новый проект" onClick={() => setAdding(true)}>
+          +
+        </button>
       </div>
       <div className="column-body" ref={setNodeRef}>
+        {adding && add(() => setAdding(false))}
         <SortableContext items={items.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           {items.map((p) => (
             <SortableCard key={p.id} project={p} />
