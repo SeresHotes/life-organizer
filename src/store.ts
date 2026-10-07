@@ -27,7 +27,7 @@ export const STATUSES: { id: Status; title: string }[] = [
 ]
 
 /** Projects whose first open task and routines are shown on the main screen. */
-export const ON_MAIN_SCREEN: Status[] = ['open', 'progress']
+export const ON_MAIN_SCREEN: Status[] = ['backlog', 'progress']
 
 export const ARCHIVE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
 
