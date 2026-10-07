@@ -134,7 +134,10 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   background: var(--panel);
 }
 .item:hover { background: var(--panel-2); }
+.sortable { touch-action: manipulation; }
+.sortable .item-body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .dragging { position: relative; z-index: 10; }
+.dragging .item-body { cursor: grabbing; }
 .dragging .item { background: var(--panel-2); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
 .item-body { flex: 1; min-width: 0; cursor: text; line-height: 1.35; min-height: 1.35em; }
 .item-text {
@@ -162,18 +165,6 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   margin-top: -1px;
 }
 .check.checked { background: var(--ok); border-color: var(--ok); }
-.handle {
-  flex: none;
-  border: none;
-  background: none;
-  padding: 0 4px;
-  color: var(--muted);
-  cursor: grab;
-  touch-action: none;
-  letter-spacing: -3px;
-  opacity: 0.6;
-}
-.handle:active { cursor: grabbing; }
 .item-edit { flex: 1; display: flex; gap: 6px; align-items: flex-start; }
 .item-edit textarea { flex: 1; resize: none; line-height: 1.35; padding: 4px 8px; overflow: hidden; }
 .icon-btn { border: none; background: none; padding: 4px 6px; }

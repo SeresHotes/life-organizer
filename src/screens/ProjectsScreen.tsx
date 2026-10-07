@@ -2,14 +2,10 @@ import { useState } from 'react'
 import {
   DndContext,
   DragOverlay,
-  MouseSensor,
-  TouchSensor,
   closestCorners,
   pointerWithin,
   type CollisionDetection,
   useDroppable,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
@@ -18,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { STATUSES, isArchived, useStore, type Project, type Status } from '../store'
 import { navigate } from '../hooks'
 import { AddItem } from '../components/AddItem'
+import { useItemSensors, vibrate } from '../components/SortableList'
 
 const isStatus = (id: unknown): id is Status => STATUSES.some((s) => s.id === id)
 
@@ -40,10 +37,7 @@ export function ProjectsScreen() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [showArchive, setShowArchive] = useState(false)
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-  )
+  const sensors = useItemSensors()
 
   const now = Date.now()
   const list = draft ?? projects
@@ -96,6 +90,7 @@ export function ProjectsScreen() {
         sensors={sensors}
         collisionDetection={collision}
         onDragStart={({ active }) => {
+          vibrate()
           setDraft(projects)
           setActiveId(String(active.id))
         }}

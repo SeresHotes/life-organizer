@@ -26,11 +26,10 @@ export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProp
     <SortableList
       items={items}
       onReorder={(a, o) => s.reorderTasks(owner, a, o, isDone)}
-      render={(t, handle) => (
+      render={(t) => (
         <ItemRow
           text={t.text}
           done={t.done}
-          handle={handle}
           sphereId={owner === null ? t.sphereId : null}
           onSphere={owner === null ? (sphereId) => s.updateTask(owner, t.id, { sphereId }) : undefined}
           onToggle={() => s.toggleTask(owner, t.id)}
@@ -57,11 +56,10 @@ export function RoutineList({ owner = null, filter = pass }: ListProps<Routine>)
   const routines = all.filter(filter)
   const open = routines.filter((r) => r.doneOn !== today)
   const done = routines.filter((r) => r.doneOn === today).sort((a, b) => a.doneAt - b.doneAt)
-  const row = (r: Routine, handle: React.ReactNode) => (
+  const row = (r: Routine) => (
     <ItemRow
       text={r.text}
       done={r.doneOn === today}
-      handle={handle}
       sphereId={owner === null ? r.sphereId : null}
       onSphere={owner === null ? (sphereId) => s.updateRoutine(owner, r.id, { sphereId }) : undefined}
       onToggle={() => s.toggleRoutine(owner, r.id, today)}
@@ -86,12 +84,11 @@ export function NoteList({ filter = pass, show = 'open' }: Omit<ListProps<Note>,
     <SortableList
       items={notes}
       onReorder={(a, o) => s.reorderNotes(a, o, archived)}
-      render={(n, handle) => (
+      render={(n) => (
         <ItemRow
           text={n.text}
           done={n.archived}
           toggleKind="archive"
-          handle={handle}
           sphereId={n.sphereId}
           onSphere={(sphereId) => s.updateNote(n.id, { sphereId })}
           onToggle={() => s.toggleNoteArchived(n.id)}

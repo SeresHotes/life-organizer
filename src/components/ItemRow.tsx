@@ -12,12 +12,11 @@ type Props = {
   sphereId?: string | null
   /** If set, the sphere can be changed while editing. */
   onSphere?: (id: string | null) => void
-  handle?: ReactNode
   badge?: ReactNode
 }
 
-/** One- or two-line item: checkbox, clamped text (tap to edit), drag handle. */
-export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, onDelete, sphereId, onSphere, handle, badge }: Props) {
+/** One- or two-line item: checkbox, clamped text (tap to edit), long press to drag. */
+export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, onDelete, sphereId, onSphere, badge }: Props) {
   const [editing, setEditing] = useState(false)
   const sphere = useStore((s) => (sphereId ? s.spheres.find((x) => x.id === sphereId) : undefined))
   return (
@@ -53,7 +52,6 @@ export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, on
           </span>
         </div>
       )}
-      {!editing && handle}
     </div>
   )
 }
