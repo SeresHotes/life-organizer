@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useStore, type Note, type Owner, type Routine, type Task } from '../store'
 import { useToday } from '../hooks'
 import { SortableList } from './SortableList'
@@ -15,6 +16,39 @@ type ListProps<T> = {
 
 const pass = () => true
 
+/** A task of the main screen (owner=null) or of a project; `badge` marks project tasks shown elsewhere. */
+export function TaskRow({ owner, task: t, badge }: { owner: Owner; task: Task; badge?: ReactNode }) {
+  const s = useStore()
+  return (
+    <ItemRow
+      text={t.text}
+      done={t.done}
+      badge={badge}
+      sphereId={owner === null ? t.sphereId : null}
+      onSphere={owner === null ? (sphereId) => s.updateTask(owner, t.id, { sphereId }) : undefined}
+      onToggle={() => s.toggleTask(owner, t.id)}
+      onSave={(text) => s.updateTask(owner, t.id, { text })}
+      onDelete={() => s.deleteTask(owner, t.id)}
+    />
+  )
+}
+
+export function RoutineRow({ owner, routine: r, today, badge }: { owner: Owner; routine: Routine; today: string; badge?: ReactNode }) {
+  const s = useStore()
+  return (
+    <ItemRow
+      text={r.text}
+      done={r.doneOn === today}
+      badge={badge}
+      sphereId={owner === null ? r.sphereId : null}
+      onSphere={owner === null ? (sphereId) => s.updateRoutine(owner, r.id, { sphereId }) : undefined}
+      onToggle={() => s.toggleRoutine(owner, r.id, today)}
+      onSave={(text) => s.updateRoutine(owner, r.id, { text })}
+      onDelete={() => s.deleteRoutine(owner, r.id)}
+    />
+  )
+}
+
 /** Open tasks first, then closed ones; each part is sortable on its own. */
 export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProps<Task>) {
   const s = useStore()
@@ -26,17 +60,7 @@ export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProp
     <SortableList
       items={items}
       onReorder={(a, o) => s.reorderTasks(owner, a, o, isDone)}
-      render={(t) => (
-        <ItemRow
-          text={t.text}
-          done={t.done}
-          sphereId={owner === null ? t.sphereId : null}
-          onSphere={owner === null ? (sphereId) => s.updateTask(owner, t.id, { sphereId }) : undefined}
-          onToggle={() => s.toggleTask(owner, t.id)}
-          onSave={(text) => s.updateTask(owner, t.id, { text })}
-          onDelete={() => s.deleteTask(owner, t.id)}
-        />
-      )}
+      render={(t) => <TaskRow owner={owner} task={t} />}
     />
   )
   return (
@@ -56,17 +80,7 @@ export function RoutineList({ owner = null, filter = pass }: ListProps<Routine>)
   const routines = all.filter(filter)
   const open = routines.filter((r) => r.doneOn !== today)
   const done = routines.filter((r) => r.doneOn === today).sort((a, b) => a.doneAt - b.doneAt)
-  const row = (r: Routine) => (
-    <ItemRow
-      text={r.text}
-      done={r.doneOn === today}
-      sphereId={owner === null ? r.sphereId : null}
-      onSphere={owner === null ? (sphereId) => s.updateRoutine(owner, r.id, { sphereId }) : undefined}
-      onToggle={() => s.toggleRoutine(owner, r.id, today)}
-      onSave={(text) => s.updateRoutine(owner, r.id, { text })}
-      onDelete={() => s.deleteRoutine(owner, r.id)}
-    />
-  )
+  const row = (r: Routine) => <RoutineRow owner={owner} routine={r} today={today} />
   return (
     <>
       <SortableList items={open} onReorder={(a, o) => s.reorderRoutines(owner, a, o, today)} render={row} />

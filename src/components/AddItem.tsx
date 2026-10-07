@@ -6,13 +6,15 @@ type Props = {
   onAdd: (text: string, sphereId: string | null) => void
   /** Show a sphere picker for the new item. */
   withSphere?: boolean
+  /** Sphere preselected in the picker. */
+  defaultSphere?: string | null
 }
 
 /** "+ New ..." button that turns into an input; Enter adds and keeps the input open for the next item. */
-export function AddItem({ label, onAdd, withSphere }: Props) {
+export function AddItem({ label, onAdd, withSphere, defaultSphere = null }: Props) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('')
-  const [sphereId, setSphereId] = useState<string | null>(null)
+  const [sphereId, setSphereId] = useState<string | null>(defaultSphere)
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (open) ref.current?.focus()
@@ -22,13 +24,16 @@ export function AddItem({ label, onAdd, withSphere }: Props) {
     if (t) onAdd(t, sphereId)
     setValue('')
   }
-  const close = () => {
-    setOpen(false)
-    setSphereId(null)
-  }
+  const close = () => setOpen(false)
   if (!open)
     return (
-      <button className="add-btn" onClick={() => setOpen(true)}>
+      <button
+        className="add-btn"
+        onClick={() => {
+          setSphereId(defaultSphere)
+          setOpen(true)
+        }}
+      >
         + {label}
       </button>
     )

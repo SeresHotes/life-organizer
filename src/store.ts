@@ -76,6 +76,12 @@ export type Data = {
   projects: Project[]
   spheres: Sphere[]
   dayStartHour: number
+  /**
+   * Order of the mixed main-screen lists (own items + items coming from projects).
+   * tasks: own task ids and `project:<id>` slots (a project's slot shows its first open task);
+   * routines: routine ids (own and projects').
+   */
+  mainOrder: { tasks: string[]; routines: string[] }
 }
 
 type UI = {
@@ -116,6 +122,7 @@ type Actions = {
   updateSphere: (id: string, patch: Partial<Omit<Sphere, 'id'>>) => void
   deleteSphere: (id: string) => void
   // misc
+  setMainOrder: (list: 'tasks' | 'routines', keys: string[]) => void
   setDayStartHour: (h: number) => void
   toggleCollapsed: (key: string) => void
   setSphereFilter: (id: string | null) => void
@@ -131,6 +138,23 @@ const initialData: Data = {
   projects: [],
   spheres: [],
   dayStartHour: 4,
+  mainOrder: { tasks: [], routines: [] },
+}
+
+/** Stable sort by position in `order`; items not in it (new ones) go first. */
+export function sortByOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
+  const pos = new Map(order.map((k, i) => [k, i]))
+  return [...items].sort((a, b) => (pos.get(a.id) ?? -1) - (pos.get(b.id) ?? -1))
+}
+
+/** Moves `activeId` to the place of `overId`. */
+export function moveKey(keys: string[], activeId: string, overId: string) {
+  const from = keys.indexOf(activeId)
+  const to = keys.indexOf(overId)
+  if (from < 0 || to < 0) return keys
+  const next = [...keys]
+  next.splice(to, 0, ...next.splice(from, 1))
+  return next
 }
 
 /** Fills fields added in later versions, so old exports/storage keep working. */
@@ -139,6 +163,7 @@ function normalize(data: Partial<Data>): Data {
   return {
     ...initialData,
     ...data,
+    mainOrder: { ...initialData.mainOrder, ...data.mainOrder },
     notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false })),
     routines: (data.routines ?? []).map(sph),
     tasks: (data.tasks ?? []).map(sph),
@@ -252,6 +277,18 @@ export const useStore = create<State>()(
             }
           }),
 
+        setMainOrder: (list, keys) =>
+          set((s) => {
+            // keep the own list in the same order, so other screens agree with the main one
+            const pos = new Map(keys.map((k, i) => [k, i]))
+            const byPos = <T extends { id: string }>(a: T, b: T) => (pos.get(a.id) ?? -1) - (pos.get(b.id) ?? -1)
+            const mainOrder = { ...s.mainOrder, [list]: keys }
+            if (list === 'tasks') {
+              const open = s.tasks.filter((t) => !t.done).sort(byPos)
+              return { mainOrder, tasks: [...open, ...s.tasks.filter((t) => t.done)] }
+            }
+            return { mainOrder, routines: [...s.routines].sort(byPos) }
+          }),
         setDayStartHour: (h) => set({ dayStartHour: h }),
         toggleCollapsed: (key) => set((s) => ({ collapsed: { ...s.collapsed, [key]: !s.collapsed[key] } })),
         setSphereFilter: (id) => set({ sphereFilter: id }),
@@ -276,4 +313,5 @@ export const pickData = (s: State): Data => ({
   projects: s.projects,
   spheres: s.spheres,
   dayStartHour: s.dayStartHour,
+  mainOrder: s.mainOrder,
 })

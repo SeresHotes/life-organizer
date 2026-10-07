@@ -110,7 +110,7 @@ export function ProjectsScreen() {
             const items = list.filter((p) => p.status === st.id && visible(p))
             return (
               <Column key={st.id} status={st.id} title={st.title} items={items}>
-                <AddItem label="Проект" onAdd={(t) => addProject(t, st.id, filter)} />
+                <AddItem label="Проект" withSphere defaultSphere={filter} onAdd={(t, sp) => addProject(t, st.id, sp)} />
                 {st.id === 'done' && archived.length > 0 && (
                   <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
                     {showArchive ? 'Скрыть архив' : `Архив · ${archived.length}`}

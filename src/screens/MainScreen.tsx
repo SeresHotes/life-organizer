@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ON_MAIN_SCREEN, useStore, type Project } from '../store'
+import { ON_MAIN_SCREEN, moveKey, sortByOrder, useStore, type Project, type Routine, type Task } from '../store'
 import { useToday, navigate } from '../hooks'
 import { Section } from '../components/Section'
-import { ItemRow } from '../components/ItemRow'
+import { SortableList } from '../components/SortableList'
 import { AddItem } from '../components/AddItem'
-import { NoteList, RoutineList, TaskList } from '../components/Lists'
+import { NoteList, RoutineRow, TaskList, TaskRow } from '../components/Lists'
 
 export function MainScreen() {
   return (
@@ -55,58 +55,65 @@ function Notes() {
 function Routines() {
   const s = useStore()
   const today = useToday()
-  // routines of active projects are shown here too
-  const projectRoutines = s.projects
-    .filter((p) => ON_MAIN_SCREEN.includes(p.status))
-    .flatMap((p) => p.routines.map((r) => ({ project: p, routine: r })))
-  const projectOpen = projectRoutines.filter(({ routine: r }) => r.doneOn !== today)
-  const projectDone = projectRoutines.filter(({ routine: r }) => r.doneOn === today)
-  const open = s.routines.filter((r) => r.doneOn !== today).length + projectOpen.length
-  const projectRow = ({ project, routine: r }: (typeof projectRoutines)[number]) => (
-    <ItemRow
-      key={r.id}
-      text={r.text}
-      done={r.doneOn === today}
-      badge={<ProjectBadge project={project} />}
-      onToggle={() => s.toggleRoutine(project.id, r.id, today)}
-      onSave={(text) => s.updateRoutine(project.id, r.id, { text })}
-      onDelete={() => s.deleteRoutine(project.id, r.id)}
+  // own routines and routines of active projects form one list, ordered by mainOrder
+  type Entry = { id: string; owner: string | null; routine: Routine; project?: Project }
+  const all: Entry[] = [
+    ...s.projects
+      .filter((p) => ON_MAIN_SCREEN.includes(p.status))
+      .flatMap((p) => p.routines.map((r) => ({ id: r.id, owner: p.id, routine: r, project: p }))),
+    ...s.routines.map((r) => ({ id: r.id, owner: null, routine: r })),
+  ]
+  const open = sortByOrder(
+    all.filter((e) => e.routine.doneOn !== today),
+    s.mainOrder.routines,
+  )
+  const done = all.filter((e) => e.routine.doneOn === today).sort((a, b) => a.routine.doneAt - b.routine.doneAt)
+  const row = (e: Entry) => (
+    <RoutineRow
+      owner={e.owner}
+      routine={e.routine}
+      today={today}
+      badge={e.project && <ProjectBadge project={e.project} />}
     />
   )
   return (
-    <Section id="routines" title="Рутина" count={open}>
+    <Section id="routines" title="Рутина" count={open.length}>
       <AddItem label="Новая рутина" withSphere onAdd={(t, sp) => s.addRoutine(null, t, sp)} />
-      {projectOpen.map(projectRow)}
-      <RoutineList />
-      {projectDone.map(projectRow)}
+      <SortableList
+        items={open}
+        onReorder={(a, o) => s.setMainOrder('routines', moveKey(open.map((e) => e.id), a, o))}
+        render={row}
+      />
+      <SortableList items={done} render={row} />
     </Section>
   )
 }
 
 function Tasks() {
   const s = useStore()
-  const projectTasks = s.projects
+  // own open tasks and one slot per active project (its first open task), ordered by mainOrder
+  type Entry = { id: string; owner: string | null; task: Task; project?: Project }
+  const projectEntries: Entry[] = s.projects
     .filter((p) => ON_MAIN_SCREEN.includes(p.status))
     .flatMap((p) => {
       const t = p.tasks.find((x) => !x.done)
-      return t ? [{ project: p, task: t }] : []
+      return t ? [{ id: 'project:' + p.id, owner: p.id, task: t, project: p }] : []
     })
-  const open = s.tasks.filter((t) => !t.done)
+  const ownEntries: Entry[] = s.tasks.filter((t) => !t.done).map((t) => ({ id: t.id, owner: null, task: t }))
+  const open = sortByOrder([...projectEntries, ...ownEntries], s.mainOrder.tasks)
   const done = s.tasks.filter((t) => t.done)
   return (
-    <Section id="tasks" title="Задачи" count={open.length + projectTasks.length}>
+    <Section id="tasks" title="Задачи" count={open.length}>
       <AddItem label="Новая задача" withSphere onAdd={(t, sp) => s.addTask(null, t, sp)} />
-      {projectTasks.map(({ project, task }) => (
-        <ItemRow
-          key={task.id}
-          text={task.text}
-          badge={<ProjectBadge project={project} />}
-          onToggle={() => s.toggleTask(project.id, task.id)}
-          onSave={(text) => s.updateTask(project.id, task.id, { text })}
-          onDelete={() => s.deleteTask(project.id, task.id)}
-        />
-      ))}
-      <TaskList />
+      <SortableList
+        items={open}
+        onReorder={(a, o) => s.setMainOrder('tasks', moveKey(open.map((e) => e.id), a, o))}
+        render={(e) => (
+          <TaskRow owner={e.owner} task={e.task} badge={e.project && <ProjectBadge project={e.project} />} />
+        )}
+      />
+      {done.length > 0 && <div className="divider">Выполнено · {done.length}</div>}
+      <TaskList show="done" />
       {done.length > 0 && (
         <button className="link-btn" onClick={() => confirm('Удалить все выполненные задачи?') && s.clearDoneTasks()}>
           Очистить выполненные
