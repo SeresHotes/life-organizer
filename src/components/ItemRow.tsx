@@ -74,7 +74,6 @@ function ItemEditor({
   const [value, setValue] = useState(initial)
   const ref = useRef<HTMLTextAreaElement>(null)
   const skipBlur = useRef(false)
-  const spheres = useStore((s) => s.spheres)
   useEffect(() => {
     const el = ref.current
     if (el) {
@@ -86,7 +85,7 @@ function ItemEditor({
     <div
       className="item-edit"
       onBlur={(e) => {
-        // save only when focus leaves the whole editor (not when moving to the sphere select)
+        // save only when focus leaves the whole editor
         if (!skipBlur.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) onSave(value.trim())
       }}
     >
@@ -105,22 +104,51 @@ function ItemEditor({
           }
         }}
       />
-      {onSphere && spheres.length > 0 && (
-        <SphereSelect className="sphere-select" value={sphereId} onChange={onSphere} />
-      )}
-      {onDelete && (
-        <button
-          className="icon-btn danger"
-          onPointerDown={() => (skipBlur.current = true)}
-          onClick={() => {
-            if (confirm('Удалить?')) onDelete()
-            else onCancel()
-          }}
-          aria-label="Удалить"
-        >
-          🗑
-        </button>
-      )}
+      <div className="edit-tools">
+        {onSphere && <SphereChips value={sphereId} onChange={onSphere} />}
+        {onDelete && (
+          <button
+            className="icon-btn danger"
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => {
+              skipBlur.current = true
+              if (confirm('Удалить?')) onDelete()
+              else onCancel()
+            }}
+            aria-label="Удалить"
+          >
+            <TrashIcon />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * One-tap sphere picker. Buttons keep focus in the text field (preventDefault on pointerdown),
+ * so picking a sphere doesn't close the editor.
+ */
+export function SphereChips({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const spheres = useStore((s) => s.spheres)
+  if (spheres.length === 0) return null
+  const chip = (id: string | null, name: string, color?: string) => (
+    <button
+      key={id ?? 'none'}
+      type="button"
+      className={'chip small' + (value === id ? ' active' : '')}
+      style={value === id ? { background: color ?? 'var(--muted)', borderColor: color ?? 'var(--muted)', color: '#111' } : { borderColor: color }}
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={() => onChange(id)}
+    >
+      {color && value !== id && <span className="dot" style={{ background: color }} />}
+      {name}
+    </button>
+  )
+  return (
+    <div className="sphere-chips">
+      {chip(null, 'Без сферы')}
+      {spheres.map((sp) => chip(sp.id, sp.name, sp.color))}
     </div>
   )
 }
@@ -189,5 +217,11 @@ const ArchiveIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="5" rx="1" />
     <path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" />
+  </svg>
+)
+
+const TrashIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" />
   </svg>
 )

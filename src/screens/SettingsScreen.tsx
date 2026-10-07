@@ -1,9 +1,19 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { checkForUpdate, hardReload } from '../update'
 import { pickData, useStore, type Data } from '../store'
 
 export function SettingsScreen() {
   const s = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [updateMsg, setUpdateMsg] = useState('')
+
+  const update = async () => {
+    setUpdateMsg('Проверяю…')
+    const r = await checkForUpdate()
+    setUpdateMsg(
+      r === 'updating' ? 'Скачиваю новую версию, приложение перезагрузится…' : r === 'latest' ? 'У вас последняя версия' : 'Не удалось проверить (нет интернета?)',
+    )
+  }
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(pickData(useStore.getState()), null, 2)], { type: 'application/json' })
@@ -59,6 +69,25 @@ export function SettingsScreen() {
           }}
         />
       </div>
+
+      <h2>Приложение</h2>
+      <p className="hint">
+        Версия {__APP_VERSION__} от {new Date(__BUILD_TIME__).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
+      </p>
+      <div className="row">
+        <button onClick={update}>Обновить</button>
+        {updateMsg && <span className="hint">{updateMsg}</span>}
+      </div>
+      <p className="hint">
+        Если обновление не подтягивается —{' '}
+        <button
+          className="link-btn inline"
+          onClick={() => confirm('Сбросить кэш приложения и загрузить заново? Данные не пострадают.') && hardReload()}
+        >
+          перезагрузить без кэша
+        </button>
+        .
+      </p>
     </div>
   )
 }

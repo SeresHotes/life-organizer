@@ -40,7 +40,7 @@ function Notes() {
   const archived = s.notes.length - open
   return (
     <Section id="notes" title="Заметки" count={open}>
-      <AddItem label="Новая заметка" onAdd={(t) => s.addNote(t)} />
+      <AddItem label="Новая заметка" withSphere onAdd={(t, sp) => s.addNote(t, sp)} />
       <NoteList />
       {archived > 0 && (
         <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
@@ -75,7 +75,7 @@ function Routines() {
   )
   return (
     <Section id="routines" title="Рутина" count={open}>
-      <AddItem label="Новая рутина" onAdd={(t) => s.addRoutine(null, t)} />
+      <AddItem label="Новая рутина" withSphere onAdd={(t, sp) => s.addRoutine(null, t, sp)} />
       {projectOpen.map(projectRow)}
       <RoutineList />
       {projectDone.map(projectRow)}
@@ -95,7 +95,7 @@ function Tasks() {
   const done = s.tasks.filter((t) => t.done)
   return (
     <Section id="tasks" title="Задачи" count={open.length + projectTasks.length}>
-      <AddItem label="Новая задача" onAdd={(t) => s.addTask(null, t)} />
+      <AddItem label="Новая задача" withSphere onAdd={(t, sp) => s.addTask(null, t, sp)} />
       {projectTasks.map(({ project, task }) => (
         <ItemRow
           key={task.id}

@@ -165,7 +165,7 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   margin-top: -1px;
 }
 .check.checked { background: var(--ok); border-color: var(--ok); }
-.item-edit { flex: 1; display: flex; gap: 6px; align-items: flex-start; }
+.item-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .item-edit textarea { flex: 1; resize: none; line-height: 1.35; padding: 4px 8px; overflow: hidden; }
 .icon-btn { border: none; background: none; padding: 4px 6px; }
 .danger { color: var(--danger); }
@@ -293,8 +293,12 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   font-size: 15px;
   line-height: 1;
 }
-.sphere-select { max-width: 40%; font-size: 0.85rem; padding: 4px 6px; }
-.item-edit { flex-wrap: wrap; }
+/* chips stay on one line and scroll sideways, delete stays on the right */
+.edit-tools { display: flex; align-items: center; gap: 6px; }
+.edit-tools:empty { display: none; }
+.sphere-chips { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.edit-tools .icon-btn { margin-left: auto; }
+.chip.small { padding: 2px 10px; font-size: 0.8rem; }
 .sphere-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
 .sphere-tile {
   text-align: left;
@@ -311,3 +315,4 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
 
 /* scroll snapping fights auto-scroll while a card is dragged */
 .board.is-dragging { scroll-snap-type: none; }
+.link-btn.inline { padding: 0; font-size: inherit; }
