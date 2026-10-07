@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useStore } from '../store'
+import { INTERVALS, intervalLabel, useStore } from '../store'
 
 type Props = {
   text: string
@@ -13,10 +13,14 @@ type Props = {
   /** If set, the sphere can be changed while editing. */
   onSphere?: (id: string | null) => void
   badge?: ReactNode
+  /** Small text on the right (e.g. time until a routine opens again). */
+  meta?: ReactNode
+  /** Extra controls shown while editing (e.g. routine interval). */
+  editExtra?: ReactNode
 }
 
 /** One- or two-line item: checkbox, clamped text (tap to edit), long press to drag. */
-export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, onDelete, sphereId, onSphere, badge }: Props) {
+export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, onDelete, sphereId, onSphere, badge, meta, editExtra }: Props) {
   const [editing, setEditing] = useState(false)
   const sphere = useStore((s) => (sphereId ? s.spheres.find((x) => x.id === sphereId) : undefined))
   return (
@@ -42,6 +46,7 @@ export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, on
           }}
           onCancel={() => setEditing(false)}
           onDelete={onDelete}
+          extra={editExtra}
         />
       ) : (
         <div className="item-body" onClick={() => setEditing(true)}>
@@ -52,6 +57,7 @@ export function ItemRow({ text, done, toggleKind = 'check', onToggle, onSave, on
           </span>
         </div>
       )}
+      {!editing && meta && <span className="item-meta">{meta}</span>}
     </div>
   )
 }
@@ -63,7 +69,9 @@ function ItemEditor({
   onSave,
   onCancel,
   onDelete,
+  extra,
 }: {
+  extra?: ReactNode
   initial: string
   sphereId: string | null
   onSphere?: (id: string | null) => void
@@ -104,6 +112,7 @@ function ItemEditor({
           }
         }}
       />
+      {extra}
       <div className="edit-tools">
         {onSphere && <SphereChips value={sphereId} onChange={onSphere} />}
         {onDelete && (
@@ -149,6 +158,26 @@ export function SphereChips({ value, onChange }: { value: string | null; onChang
     <div className="sphere-chips">
       {chip(null, 'Без сферы')}
       {spheres.map((sp) => chip(sp.id, sp.name, sp.color))}
+    </div>
+  )
+}
+
+/** Interval picker for routines: 1ч, 6ч, 1д … 7д. */
+export function IntervalChips({ value, onChange }: { value: number; onChange: (h: number) => void }) {
+  return (
+    <div className="sphere-chips interval-chips">
+      <span className="chips-label">Повтор</span>
+      {INTERVALS.map((h) => (
+        <button
+          key={h}
+          type="button"
+          className={'chip small' + (value === h ? ' active filled' : '')}
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => onChange(h)}
+        >
+          {intervalLabel(h)}
+        </button>
+      ))}
     </div>
   )
 }

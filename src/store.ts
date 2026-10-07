@@ -3,7 +3,43 @@ import { persist } from 'zustand/middleware'
 
 export type Task = { id: string; text: string; done: boolean; sphereId: string | null }
 export type Note = { id: string; text: string; archived: boolean; sphereId: string | null }
-export type Routine = { id: string; text: string; doneOn: string | null; doneAt: number; sphereId: string | null }
+/** `interval` — hours until a done routine opens again (24 and more are whole days, counted from the day start). */
+export type Routine = {
+  id: string
+  text: string
+  doneOn: string | null
+  doneAt: number
+  sphereId: string | null
+  interval: number
+}
+
+export const INTERVALS = [1, 6, 24, 48, 72, 96, 120, 144, 168]
+export const intervalLabel = (h: number) => (h < 24 ? `${h}ч` : `${h / 24}д`)
+
+const HOUR = 60 * 60 * 1000
+
+/** When a done routine opens again (null if it isn't done). */
+export function routineReopenAt(r: Routine, dayStartHour: number): number | null {
+  if (r.doneOn === null || !r.doneAt) return null
+  if (r.interval < 24) return r.doneAt + r.interval * HOUR
+  // start of the logical day the routine was done on, plus N days
+  const d = new Date(r.doneAt - dayStartHour * HOUR)
+  d.setHours(dayStartHour, 0, 0, 0)
+  d.setDate(d.getDate() + Math.round(r.interval / 24))
+  return d.getTime()
+}
+
+export const isRoutineDone = (r: Routine, now: number, dayStartHour: number) => {
+  const at = routineReopenAt(r, dayStartHour)
+  return at !== null && now < at
+}
+
+/** Short "time left" with a single number: 3д, 20ч, 45м. */
+export function shortLeft(ms: number) {
+  if (ms >= 24 * HOUR) return `${Math.ceil(ms / (24 * HOUR))}д`
+  if (ms >= HOUR) return `${Math.ceil(ms / HOUR)}ч`
+  return `${Math.max(1, Math.ceil(ms / 60000))}м`
+}
 export type Status = 'open' | 'backlog' | 'progress' | 'waiting' | 'done'
 export type Sphere = { id: string; name: string; color: string }
 export type Project = {
@@ -100,11 +136,11 @@ type Actions = {
   toggleNoteArchived: (id: string) => void
   reorderNotes: (activeId: string, overId: string, archived: boolean) => void
   // routines (main screen or project)
-  addRoutine: (owner: Owner, text: string, sphereId?: string | null) => void
+  addRoutine: (owner: Owner, text: string, sphereId?: string | null, interval?: number) => void
   updateRoutine: (owner: Owner, id: string, patch: Partial<Omit<Routine, 'id'>>) => void
   deleteRoutine: (owner: Owner, id: string) => void
-  toggleRoutine: (owner: Owner, id: string, today: string) => void
-  reorderRoutines: (owner: Owner, activeId: string, overId: string, today: string) => void
+  toggleRoutine: (owner: Owner, id: string) => void
+  reorderRoutines: (owner: Owner, activeId: string, overId: string) => void
   // tasks (main screen or project)
   addTask: (owner: Owner, text: string, sphereId?: string | null) => void
   updateTask: (owner: Owner, id: string, patch: Partial<Omit<Task, 'id'>>) => void
@@ -160,24 +196,25 @@ export function moveKey(keys: string[], activeId: string, overId: string) {
 /** Fills fields added in later versions, so old exports/storage keep working. */
 function normalize(data: Partial<Data>): Data {
   const sph = <T extends object>(x: T) => ({ sphereId: null, ...x })
+  const routine = (r: Routine) => ({ ...sph(r), interval: r.interval ?? 24 })
   return {
     ...initialData,
     ...data,
     mainOrder: { ...initialData.mainOrder, ...data.mainOrder },
     notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false })),
-    routines: (data.routines ?? []).map(sph),
+    routines: (data.routines ?? []).map(routine),
     tasks: (data.tasks ?? []).map(sph),
     projects: (data.projects ?? []).map((p) => ({
       ...p,
       tasks: (p.tasks ?? []).map(sph),
-      routines: (p.routines ?? []).map(sph),
+      routines: (p.routines ?? []).map(routine),
     })),
   }
 }
 
 export const useStore = create<State>()(
   persist(
-    (set) => {
+    (set, get) => {
       const mapProject = (pid: string, fn: (p: Project) => Project) =>
         set((s) => ({ projects: s.projects.map((p) => (p.id === pid ? fn(p) : p)) }))
 
@@ -204,19 +241,29 @@ export const useStore = create<State>()(
         reorderNotes: (a, o, archived) =>
           set((s) => ({ notes: reorderWithin(s.notes, (n) => n.archived === archived, a, o) })),
 
-        addRoutine: (owner, text, sphereId = null) =>
-          editList('routines', owner, (l) => [{ id: uid(), text, doneOn: null, doneAt: 0, sphereId }, ...l]),
+        addRoutine: (owner, text, sphereId = null, interval = 24) =>
+          editList('routines', owner, (l) => [{ id: uid(), text, doneOn: null, doneAt: 0, sphereId, interval }, ...l]),
         updateRoutine: (owner, id, patch) =>
           editList('routines', owner, (l) => l.map((r) => (r.id === id ? { ...r, ...patch } : r))),
         deleteRoutine: (owner, id) => editList('routines', owner, (l) => l.filter((r) => r.id !== id)),
-        toggleRoutine: (owner, id, today) =>
+        toggleRoutine: (owner, id) => {
+          const { dayStartHour } = get()
+          const now = Date.now()
           editList('routines', owner, (l) =>
             l.map((r) =>
-              r.id !== id ? r : r.doneOn === today ? { ...r, doneOn: null } : { ...r, doneOn: today, doneAt: Date.now() },
+              r.id !== id
+                ? r
+                : isRoutineDone(r, now, dayStartHour)
+                  ? { ...r, doneOn: null, doneAt: 0 }
+                  : { ...r, doneOn: dayKey(dayStartHour), doneAt: now },
             ),
-          ),
-        reorderRoutines: (owner, a, o, today) =>
-          editList('routines', owner, (l) => reorderWithin(l, (r) => r.doneOn !== today, a, o)),
+          )
+        },
+        reorderRoutines: (owner, a, o) => {
+          const { dayStartHour } = get()
+          const now = Date.now()
+          editList('routines', owner, (l) => reorderWithin(l, (r) => !isRoutineDone(r, now, dayStartHour), a, o))
+        },
 
         addTask: (owner, text, sphereId = null) =>
           editList('tasks', owner, (l) => [{ id: uid(), text, done: false, sphereId }, ...l]),
@@ -297,7 +344,7 @@ export const useStore = create<State>()(
     },
     {
       name: 'life-organizer',
-      version: 2,
+      version: 3,
       migrate: (persisted) => {
         const s = persisted as Partial<State>
         return { ...s, ...normalize(s) } as State

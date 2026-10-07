@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { useStore, type Note, type Owner, type Routine, type Task } from '../store'
-import { useToday } from '../hooks'
+import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type Owner, type Routine, type Task } from '../store'
+import { useRoutineDone } from '../hooks'
 import { SortableList } from './SortableList'
-import { ItemRow } from './ItemRow'
+import { IntervalChips, ItemRow } from './ItemRow'
 
 type Show = 'open' | 'done' | 'all'
 
@@ -33,16 +33,22 @@ export function TaskRow({ owner, task: t, badge }: { owner: Owner; task: Task; b
   )
 }
 
-export function RoutineRow({ owner, routine: r, today, badge }: { owner: Owner; routine: Routine; today: string; badge?: ReactNode }) {
+/** A routine; when done shows how long until it opens again. */
+export function RoutineRow({ owner, routine: r, badge }: { owner: Owner; routine: Routine; badge?: ReactNode }) {
   const s = useStore()
+  const { now, dayStartHour } = useRoutineDone()
+  const reopenAt = routineReopenAt(r, dayStartHour)
+  const done = reopenAt !== null && now < reopenAt
   return (
     <ItemRow
       text={r.text}
-      done={r.doneOn === today}
+      done={done}
       badge={badge}
+      meta={done ? shortLeft(reopenAt - now) : r.interval !== 24 ? '↻' + intervalLabel(r.interval) : null}
+      editExtra={<IntervalChips value={r.interval} onChange={(interval) => s.updateRoutine(owner, r.id, { interval })} />}
       sphereId={owner === null ? r.sphereId : null}
       onSphere={owner === null ? (sphereId) => s.updateRoutine(owner, r.id, { sphereId }) : undefined}
-      onToggle={() => s.toggleRoutine(owner, r.id, today)}
+      onToggle={() => s.toggleRoutine(owner, r.id)}
       onSave={(text) => s.updateRoutine(owner, r.id, { text })}
       onDelete={() => s.deleteRoutine(owner, r.id)}
     />
@@ -72,18 +78,18 @@ export function TaskList({ owner = null, filter = pass, show = 'all' }: ListProp
   )
 }
 
-/** Routines: open ones (sortable) first, then the ones done today in completion order. */
+/** Routines: open ones (sortable) first, then the done ones in completion order. */
 export function RoutineList({ owner = null, filter = pass }: ListProps<Routine>) {
   const s = useStore()
-  const today = useToday()
+  const { isDone } = useRoutineDone()
   const all = owner === null ? s.routines : (s.projects.find((p) => p.id === owner)?.routines ?? [])
   const routines = all.filter(filter)
-  const open = routines.filter((r) => r.doneOn !== today)
-  const done = routines.filter((r) => r.doneOn === today).sort((a, b) => a.doneAt - b.doneAt)
-  const row = (r: Routine) => <RoutineRow owner={owner} routine={r} today={today} />
+  const open = routines.filter((r) => !isDone(r))
+  const done = routines.filter(isDone).sort((a, b) => a.doneAt - b.doneAt)
+  const row = (r: Routine) => <RoutineRow owner={owner} routine={r} />
   return (
     <>
-      <SortableList items={open} onReorder={(a, o) => s.reorderRoutines(owner, a, o, today)} render={row} />
+      <SortableList items={open} onReorder={(a, o) => s.reorderRoutines(owner, a, o)} render={row} />
       <SortableList items={done} render={row} />
     </>
   )

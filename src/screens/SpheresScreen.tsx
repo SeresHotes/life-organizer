@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { STATUSES, isArchived, useStore, type Sphere } from '../store'
-import { navigate, useToday } from '../hooks'
+import { navigate, useRoutineDone } from '../hooks'
 import { AddItem } from '../components/AddItem'
 import { NoteList, RoutineList, TaskList } from '../components/Lists'
 import { Card } from './ProjectsScreen'
@@ -36,12 +36,12 @@ export function SpheresScreen() {
 
 function SphereTile({ sphere }: { sphere: Sphere }) {
   const s = useStore()
-  const today = useToday()
+  const { isDone } = useRoutineDone()
   const mine = <T extends { sphereId: string | null }>(x: T) => x.sphereId === sphere.id
   const projects = s.projects.filter((p) => mine(p) && p.status !== 'done').length
   const tasks = s.tasks.filter((t) => mine(t) && !t.done).length
   const notes = s.notes.filter((n) => mine(n) && !n.archived).length
-  const routines = s.routines.filter((r) => mine(r) && r.doneOn !== today).length
+  const routines = s.routines.filter((r) => mine(r) && !isDone(r)).length
   return (
     <button className="sphere-tile" style={{ borderLeftColor: sphere.color }} onClick={() => navigate('sphere/' + sphere.id)}>
       <div className="card-title">{sphere.name}</div>
@@ -115,7 +115,7 @@ export function SphereScreen({ id }: { id: string }) {
       <TaskList filter={mine} show="open" />
 
       <h3>Рутина</h3>
-      <AddItem label="Новая рутина" onAdd={(t) => s.addRoutine(null, t, id)} />
+      <AddItem label="Новая рутина" withInterval onAdd={(t, _, interval) => s.addRoutine(null, t, id, interval)} />
       <RoutineList filter={mine} />
 
       <h3>Заметки</h3>

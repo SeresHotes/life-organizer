@@ -51,7 +51,7 @@ export function ProjectScreen({ id }: { id: string }) {
       <AddItem label="Новая задача" onAdd={(t) => s.addTask(p.id, t)} />
       <TaskList owner={p.id} />
       <h3>Рутина</h3>
-      <AddItem label="Новая рутина" onAdd={(t) => s.addRoutine(p.id, t)} />
+      <AddItem label="Новая рутина" withInterval onAdd={(t, _, interval) => s.addRoutine(p.id, t, null, interval)} />
       <RoutineList owner={p.id} />
       <button
         className="link-btn danger"

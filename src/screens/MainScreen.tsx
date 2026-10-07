@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { ON_MAIN_SCREEN, moveKey, sortByOrder, useStore, type Project, type Routine, type Task } from '../store'
-import { useToday, navigate } from '../hooks'
+import { useRoutineDone, navigate } from '../hooks'
 import { Section } from '../components/Section'
 import { SortableList } from '../components/SortableList'
-import { AddItem } from '../components/AddItem'
+import { AddForm } from '../components/AddItem'
 import { NoteList, RoutineRow, TaskList, TaskRow } from '../components/Lists'
 
 export function MainScreen() {
@@ -39,8 +39,12 @@ function Notes() {
   const open = s.notes.filter((n) => !n.archived).length
   const archived = s.notes.length - open
   return (
-    <Section id="notes" title="Заметки" count={open}>
-      <AddItem label="Новая заметка" withSphere onAdd={(t, sp) => s.addNote(t, sp)} />
+    <Section
+      id="notes"
+      title="Заметки"
+      count={open}
+      add={(close) => <AddForm label="Новая заметка" withSphere onAdd={(t, sp) => s.addNote(t, sp)} onClose={close} />}
+    >
       <NoteList />
       {archived > 0 && (
         <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
@@ -54,7 +58,7 @@ function Notes() {
 
 function Routines() {
   const s = useStore()
-  const today = useToday()
+  const { isDone } = useRoutineDone()
   // own routines and routines of active projects form one list, ordered by mainOrder
   type Entry = { id: string; owner: string | null; routine: Routine; project?: Project }
   const all: Entry[] = [
@@ -64,21 +68,32 @@ function Routines() {
     ...s.routines.map((r) => ({ id: r.id, owner: null, routine: r })),
   ]
   const open = sortByOrder(
-    all.filter((e) => e.routine.doneOn !== today),
+    all.filter((e) => !isDone(e.routine)),
     s.mainOrder.routines,
   )
-  const done = all.filter((e) => e.routine.doneOn === today).sort((a, b) => a.routine.doneAt - b.routine.doneAt)
+  const done = all.filter((e) => isDone(e.routine)).sort((a, b) => a.routine.doneAt - b.routine.doneAt)
   const row = (e: Entry) => (
     <RoutineRow
       owner={e.owner}
       routine={e.routine}
-      today={today}
       badge={e.project && <ProjectBadge project={e.project} />}
     />
   )
   return (
-    <Section id="routines" title="Рутина" count={open.length}>
-      <AddItem label="Новая рутина" withSphere onAdd={(t, sp) => s.addRoutine(null, t, sp)} />
+    <Section
+      id="routines"
+      title="Рутина"
+      count={open.length}
+      add={(close) => (
+        <AddForm
+          label="Новая рутина"
+          withSphere
+          withInterval
+          onAdd={(t, sp, interval) => s.addRoutine(null, t, sp, interval)}
+          onClose={close}
+        />
+      )}
+    >
       <SortableList
         items={open}
         onReorder={(a, o) => s.setMainOrder('routines', moveKey(open.map((e) => e.id), a, o))}
@@ -103,8 +118,12 @@ function Tasks() {
   const open = sortByOrder([...projectEntries, ...ownEntries], s.mainOrder.tasks)
   const done = s.tasks.filter((t) => t.done)
   return (
-    <Section id="tasks" title="Задачи" count={open.length}>
-      <AddItem label="Новая задача" withSphere onAdd={(t, sp) => s.addTask(null, t, sp)} />
+    <Section
+      id="tasks"
+      title="Задачи"
+      count={open.length}
+      add={(close) => <AddForm label="Новая задача" withSphere onAdd={(t, sp) => s.addTask(null, t, sp)} onClose={close} />}
+    >
       <SortableList
         items={open}
         onReorder={(a, o) => s.setMainOrder('tasks', moveKey(open.map((e) => e.id), a, o))}

@@ -1,21 +1,26 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { dayKey, useStore } from './store'
+import { isRoutineDone, useStore, type Routine } from './store'
 
-/** Current logical day key; re-renders when the day rolls over. */
-export function useToday() {
-  const dayStartHour = useStore((s) => s.dayStartHour)
-  const [today, setToday] = useState(() => dayKey(dayStartHour))
+/** Current time, refreshed every 30 seconds and when the app comes back to the foreground. */
+export function useNow() {
+  const [now, setNow] = useState(Date.now)
   useEffect(() => {
-    const tick = () => setToday(dayKey(dayStartHour))
-    tick()
+    const tick = () => setNow(Date.now())
     const t = setInterval(tick, 30_000)
     document.addEventListener('visibilitychange', tick)
     return () => {
       clearInterval(t)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [dayStartHour])
-  return today
+  }, [])
+  return now
+}
+
+/** Predicate "routine is done right now" that re-renders as time passes. */
+export function useRoutineDone() {
+  const now = useNow()
+  const dayStartHour = useStore((s) => s.dayStartHour)
+  return { now, dayStartHour, isDone: (r: Routine) => isRoutineDone(r, now, dayStartHour) }
 }
 
 const subscribeHash = (cb: () => void) => {

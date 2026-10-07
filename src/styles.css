@@ -100,18 +100,37 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   overflow: hidden;
 }
 .section.collapsed { flex: 0 0 auto; }
-.section-head {
+.section-head { display: flex; align-items: center; }
+.section-toggle {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   border: none;
   border-radius: 0;
   background: none;
-  padding: 10px 12px;
+  padding: 10px 4px 10px 12px;
   font-weight: 600;
   text-align: left;
 }
-.section-title { flex: 1; }
+.section-toggle .count { margin-left: 2px; }
+.add-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--panel-2);
+  color: var(--accent);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.item-meta { flex: none; color: var(--muted); font-size: 0.75rem; padding-top: 2px; }
+.chips-label { color: var(--muted); font-size: 0.8rem; align-self: center; flex: none; }
+.chip.filled.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.section-title { flex: 0 1 auto; }
 .chevron { color: var(--muted); width: 1em; }
 .count {
   color: var(--muted);
