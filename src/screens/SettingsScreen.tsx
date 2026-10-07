@@ -1,11 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { pickData, useStore, type Data } from '../store'
-
-const PALETTE = ['#7aa2f7', '#9ece6a', '#e0af68', '#f7768e', '#bb9af7', '#7dcfff', '#ff9e64', '#c0caf5']
 
 export function SettingsScreen() {
   const s = useStore()
-  const [name, setName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const exportData = () => {
@@ -29,33 +26,6 @@ export function SettingsScreen() {
 
   return (
     <div className="page settings">
-      <h2>Сферы жизни</h2>
-      {s.spheres.map((sp) => (
-        <div className="row sphere-row" key={sp.id}>
-          <input type="color" value={sp.color} onChange={(e) => s.updateSphere(sp.id, { color: e.target.value })} />
-          <input value={sp.name} onChange={(e) => s.updateSphere(sp.id, { name: e.target.value })} />
-          <button
-            className="icon-btn danger"
-            onClick={() => confirm(`Удалить сферу «${sp.name}»?`) && s.deleteSphere(sp.id)}
-            aria-label="Удалить"
-          >
-            🗑
-          </button>
-        </div>
-      ))}
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!name.trim()) return
-          s.addSphere(name.trim(), PALETTE[s.spheres.length % PALETTE.length])
-          setName('')
-        }}
-      >
-        <input value={name} placeholder="Новая сфера (здоровье, работа…)" onChange={(e) => setName(e.target.value)} />
-        <button type="submit">Добавить</button>
-      </form>
-
       <h2>День</h2>
       <label className="row">
         Новый день начинается в

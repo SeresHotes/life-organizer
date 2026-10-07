@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type Task = { id: string; text: string; done: boolean }
-export type Note = { id: string; text: string }
-export type Routine = { id: string; text: string; doneOn: string | null; doneAt: number }
+export type Task = { id: string; text: string; done: boolean; sphereId: string | null }
+export type Note = { id: string; text: string; archived: boolean; sphereId: string | null }
+export type Routine = { id: string; text: string; doneOn: string | null; doneAt: number; sphereId: string | null }
 export type Status = 'open' | 'backlog' | 'progress' | 'waiting' | 'done'
 export type Sphere = { id: string; name: string; color: string }
 export type Project = {
@@ -13,6 +13,7 @@ export type Project = {
   status: Status
   sphereId: string | null
   tasks: Task[]
+  routines: Routine[]
   createdAt: number
   doneAt: number | null
 }
@@ -79,37 +80,36 @@ type UI = {
   sphereFilter: string | null
 }
 
+/** Owner of a task/routine list: a project id, or null for the main screen. */
+export type Owner = string | null
+
 type Actions = {
   // notes
-  addNote: (text: string) => void
-  updateNote: (id: string, text: string) => void
+  addNote: (text: string, sphereId?: string | null) => void
+  updateNote: (id: string, patch: Partial<Omit<Note, 'id'>>) => void
   deleteNote: (id: string) => void
-  reorderNotes: (activeId: string, overId: string) => void
-  // routines
-  addRoutine: (text: string) => void
-  updateRoutine: (id: string, text: string) => void
-  deleteRoutine: (id: string) => void
-  toggleRoutine: (id: string, today: string) => void
-  reorderRoutines: (activeId: string, overId: string, today: string) => void
-  // tasks (main screen)
-  addTask: (text: string) => void
-  updateTask: (id: string, text: string) => void
-  deleteTask: (id: string) => void
-  toggleTask: (id: string) => void
-  reorderTasks: (activeId: string, overId: string, done: boolean) => void
+  toggleNoteArchived: (id: string) => void
+  reorderNotes: (activeId: string, overId: string, archived: boolean) => void
+  // routines (main screen or project)
+  addRoutine: (owner: Owner, text: string, sphereId?: string | null) => void
+  updateRoutine: (owner: Owner, id: string, patch: Partial<Omit<Routine, 'id'>>) => void
+  deleteRoutine: (owner: Owner, id: string) => void
+  toggleRoutine: (owner: Owner, id: string, today: string) => void
+  reorderRoutines: (owner: Owner, activeId: string, overId: string, today: string) => void
+  // tasks (main screen or project)
+  addTask: (owner: Owner, text: string, sphereId?: string | null) => void
+  updateTask: (owner: Owner, id: string, patch: Partial<Omit<Task, 'id'>>) => void
+  deleteTask: (owner: Owner, id: string) => void
+  toggleTask: (owner: Owner, id: string) => void
+  reorderTasks: (owner: Owner, activeId: string, overId: string, done: boolean) => void
   clearDoneTasks: () => void
   // projects
-  addProject: (title: string, status: Status) => string
-  updateProject: (id: string, patch: Partial<Omit<Project, 'id' | 'tasks'>>) => void
+  addProject: (title: string, status: Status, sphereId?: string | null) => string
+  updateProject: (id: string, patch: Partial<Omit<Project, 'id' | 'tasks' | 'routines'>>) => void
   deleteProject: (id: string) => void
   setProjects: (projects: Project[]) => void
-  addProjectTask: (pid: string, text: string) => void
-  updateProjectTask: (pid: string, id: string, text: string) => void
-  deleteProjectTask: (pid: string, id: string) => void
-  toggleProjectTask: (pid: string, id: string) => void
-  reorderProjectTasks: (pid: string, activeId: string, overId: string, done: boolean) => void
   // spheres
-  addSphere: (name: string, color: string) => void
+  addSphere: (name: string, color: string) => string
   updateSphere: (id: string, patch: Partial<Omit<Sphere, 'id'>>) => void
   deleteSphere: (id: string) => void
   // misc
@@ -130,56 +130,90 @@ const initialData: Data = {
   dayStartHour: 4,
 }
 
+/** Fills fields added in later versions, so old exports/storage keep working. */
+function normalize(data: Partial<Data>): Data {
+  const sph = <T extends object>(x: T) => ({ sphereId: null, ...x })
+  return {
+    ...initialData,
+    ...data,
+    notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false })),
+    routines: (data.routines ?? []).map(sph),
+    tasks: (data.tasks ?? []).map(sph),
+    projects: (data.projects ?? []).map((p) => ({
+      ...p,
+      tasks: (p.tasks ?? []).map(sph),
+      routines: (p.routines ?? []).map(sph),
+    })),
+  }
+}
+
 export const useStore = create<State>()(
   persist(
-    (set, get) => {
+    (set) => {
       const mapProject = (pid: string, fn: (p: Project) => Project) =>
         set((s) => ({ projects: s.projects.map((p) => (p.id === pid ? fn(p) : p)) }))
+
+      /** Applies `fn` to the tasks/routines list of the main screen or of a project. */
+      function editList<K extends 'tasks' | 'routines'>(key: K, owner: Owner, fn: (list: Data[K]) => Data[K]) {
+        if (owner === null) set((s) => ({ [key]: fn(s[key]) }) as Partial<State>)
+        else mapProject(owner, (p) => ({ ...p, [key]: fn(p[key] as Data[K]) }))
+      }
 
       return {
         ...initialData,
         collapsed: {},
         sphereFilter: null,
 
-        addNote: (text) => set((s) => ({ notes: [{ id: uid(), text }, ...s.notes] })),
-        updateNote: (id, text) => set((s) => ({ notes: s.notes.map((n) => (n.id === id ? { ...n, text } : n)) })),
+        addNote: (text, sphereId = null) =>
+          set((s) => ({ notes: [{ id: uid(), text, archived: false, sphereId }, ...s.notes] })),
+        updateNote: (id, patch) => set((s) => ({ notes: s.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
         deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
-        reorderNotes: (a, o) => set((s) => ({ notes: reorderWithin(s.notes, () => true, a, o) })),
+        toggleNoteArchived: (id) =>
+          set((s) => {
+            const n = s.notes.find((x) => x.id === id)
+            return n ? { notes: moveToEnd(s.notes, id, { archived: !n.archived }) } : {}
+          }),
+        reorderNotes: (a, o, archived) =>
+          set((s) => ({ notes: reorderWithin(s.notes, (n) => n.archived === archived, a, o) })),
 
-        addRoutine: (text) =>
-          set((s) => ({ routines: [{ id: uid(), text, doneOn: null, doneAt: 0 }, ...s.routines] })),
-        updateRoutine: (id, text) =>
-          set((s) => ({ routines: s.routines.map((r) => (r.id === id ? { ...r, text } : r)) })),
-        deleteRoutine: (id) => set((s) => ({ routines: s.routines.filter((r) => r.id !== id) })),
-        toggleRoutine: (id, today) =>
-          set((s) => ({
-            routines: s.routines.map((r) =>
+        addRoutine: (owner, text, sphereId = null) =>
+          editList('routines', owner, (l) => [{ id: uid(), text, doneOn: null, doneAt: 0, sphereId }, ...l]),
+        updateRoutine: (owner, id, patch) =>
+          editList('routines', owner, (l) => l.map((r) => (r.id === id ? { ...r, ...patch } : r))),
+        deleteRoutine: (owner, id) => editList('routines', owner, (l) => l.filter((r) => r.id !== id)),
+        toggleRoutine: (owner, id, today) =>
+          editList('routines', owner, (l) =>
+            l.map((r) =>
               r.id !== id ? r : r.doneOn === today ? { ...r, doneOn: null } : { ...r, doneOn: today, doneAt: Date.now() },
             ),
-          })),
-        reorderRoutines: (a, o, today) =>
-          set((s) => ({ routines: reorderWithin(s.routines, (r) => r.doneOn !== today, a, o) })),
+          ),
+        reorderRoutines: (owner, a, o, today) =>
+          editList('routines', owner, (l) => reorderWithin(l, (r) => r.doneOn !== today, a, o)),
 
-        addTask: (text) => set((s) => ({ tasks: [{ id: uid(), text, done: false }, ...s.tasks] })),
-        updateTask: (id, text) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, text } : t)) })),
-        deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
-        toggleTask: (id) =>
-          set((s) => {
-            const t = s.tasks.find((x) => x.id === id)
-            return t ? { tasks: moveToEnd(s.tasks, id, { done: !t.done }) } : {}
+        addTask: (owner, text, sphereId = null) =>
+          editList('tasks', owner, (l) => [{ id: uid(), text, done: false, sphereId }, ...l]),
+        updateTask: (owner, id, patch) =>
+          editList('tasks', owner, (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t))),
+        deleteTask: (owner, id) => editList('tasks', owner, (l) => l.filter((t) => t.id !== id)),
+        toggleTask: (owner, id) =>
+          editList('tasks', owner, (l) => {
+            const t = l.find((x) => x.id === id)
+            return t ? moveToEnd(l, id, { done: !t.done }) : l
           }),
-        reorderTasks: (a, o, done) => set((s) => ({ tasks: reorderWithin(s.tasks, (t) => t.done === done, a, o) })),
+        reorderTasks: (owner, a, o, done) =>
+          editList('tasks', owner, (l) => reorderWithin(l, (t) => t.done === done, a, o)),
         clearDoneTasks: () => set((s) => ({ tasks: s.tasks.filter((t) => !t.done) })),
 
-        addProject: (title, status) => {
+        addProject: (title, status, sphereId = null) => {
           const id = uid()
           const p: Project = {
             id,
             title,
             description: '',
             status,
-            sphereId: get().sphereFilter,
+            sphereId,
             tasks: [],
+            routines: [],
             createdAt: Date.now(),
             doneAt: status === 'done' ? Date.now() : null,
           }
@@ -194,36 +228,41 @@ export const useStore = create<State>()(
           }),
         deleteProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
         setProjects: (projects) => set({ projects }),
-        addProjectTask: (pid, text) =>
-          mapProject(pid, (p) => ({ ...p, tasks: [{ id: uid(), text, done: false }, ...p.tasks] })),
-        updateProjectTask: (pid, id, text) =>
-          mapProject(pid, (p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === id ? { ...t, text } : t)) })),
-        deleteProjectTask: (pid, id) => mapProject(pid, (p) => ({ ...p, tasks: p.tasks.filter((t) => t.id !== id) })),
-        toggleProjectTask: (pid, id) =>
-          mapProject(pid, (p) => {
-            const t = p.tasks.find((x) => x.id === id)
-            return t ? { ...p, tasks: moveToEnd(p.tasks, id, { done: !t.done }) } : p
-          }),
-        reorderProjectTasks: (pid, a, o, done) =>
-          mapProject(pid, (p) => ({ ...p, tasks: reorderWithin(p.tasks, (t) => t.done === done, a, o) })),
 
-        addSphere: (name, color) => set((s) => ({ spheres: [...s.spheres, { id: uid(), name, color }] })),
+        addSphere: (name, color) => {
+          const id = uid()
+          set((s) => ({ spheres: [...s.spheres, { id, name, color }] }))
+          return id
+        },
         updateSphere: (id, patch) =>
           set((s) => ({ spheres: s.spheres.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
         deleteSphere: (id) =>
-          set((s) => ({
-            spheres: s.spheres.filter((x) => x.id !== id),
-            projects: s.projects.map((p) => (p.sphereId === id ? { ...p, sphereId: null } : p)),
-            sphereFilter: s.sphereFilter === id ? null : s.sphereFilter,
-          })),
+          set((s) => {
+            const un = <T extends { sphereId: string | null }>(x: T): T => (x.sphereId === id ? { ...x, sphereId: null } : x)
+            return {
+              spheres: s.spheres.filter((x) => x.id !== id),
+              notes: s.notes.map(un),
+              routines: s.routines.map(un),
+              tasks: s.tasks.map(un),
+              projects: s.projects.map(un),
+              sphereFilter: s.sphereFilter === id ? null : s.sphereFilter,
+            }
+          }),
 
         setDayStartHour: (h) => set({ dayStartHour: h }),
         toggleCollapsed: (key) => set((s) => ({ collapsed: { ...s.collapsed, [key]: !s.collapsed[key] } })),
         setSphereFilter: (id) => set({ sphereFilter: id }),
-        importData: (data) => set({ ...initialData, ...data }),
+        importData: (data) => set(normalize(data)),
       }
     },
-    { name: 'life-organizer', version: 1 },
+    {
+      name: 'life-organizer',
+      version: 2,
+      migrate: (persisted) => {
+        const s = persisted as Partial<State>
+        return { ...s, ...normalize(s) } as State
+      },
+    },
   ),
 )
 

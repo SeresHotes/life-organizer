@@ -1,12 +1,13 @@
 import { STATUSES, useStore, type Status } from '../store'
 import { navigate } from '../hooks'
 import { AddItem } from '../components/AddItem'
-import { AutoTextarea } from '../components/ItemRow'
-import { TaskList } from '../components/TaskList'
+import { AutoTextarea, SphereSelect } from '../components/ItemRow'
+import { RoutineList, TaskList } from '../components/Lists'
 
 export function ProjectScreen({ id }: { id: string }) {
   const s = useStore()
   const p = s.projects.find((x) => x.id === id)
+  const back = () => (history.length > 1 ? history.back() : navigate('projects'))
   if (!p)
     return (
       <div className="page">
@@ -19,7 +20,7 @@ export function ProjectScreen({ id }: { id: string }) {
   return (
     <div className="page project-page">
       <div className="page-head">
-        <button className="icon-btn" onClick={() => navigate('projects')} aria-label="Назад">
+        <button className="icon-btn" onClick={back} aria-label="Назад">
           ←
         </button>
         <input
@@ -37,14 +38,7 @@ export function ProjectScreen({ id }: { id: string }) {
             </option>
           ))}
         </select>
-        <select value={p.sphereId ?? ''} onChange={(e) => s.updateProject(p.id, { sphereId: e.target.value || null })}>
-          <option value="">Без сферы</option>
-          {s.spheres.map((sp) => (
-            <option key={sp.id} value={sp.id}>
-              {sp.name}
-            </option>
-          ))}
-        </select>
+        <SphereSelect value={p.sphereId} onChange={(sphereId) => s.updateProject(p.id, { sphereId })} />
       </div>
       <div className="description">
         <AutoTextarea
@@ -54,14 +48,11 @@ export function ProjectScreen({ id }: { id: string }) {
         />
       </div>
       <h3>Задачи</h3>
-      <AddItem label="Новая задача" onAdd={(t) => s.addProjectTask(p.id, t)} />
-      <TaskList
-        tasks={p.tasks}
-        onToggle={(tid) => s.toggleProjectTask(p.id, tid)}
-        onSave={(tid, t) => s.updateProjectTask(p.id, tid, t)}
-        onDelete={(tid) => s.deleteProjectTask(p.id, tid)}
-        onReorder={(a, o, done) => s.reorderProjectTasks(p.id, a, o, done)}
-      />
+      <AddItem label="Новая задача" onAdd={(t) => s.addTask(p.id, t)} />
+      <TaskList owner={p.id} />
+      <h3>Рутина</h3>
+      <AddItem label="Новая рутина" onAdd={(t) => s.addRoutine(p.id, t)} />
+      <RoutineList owner={p.id} />
       <button
         className="link-btn danger"
         onClick={() => {

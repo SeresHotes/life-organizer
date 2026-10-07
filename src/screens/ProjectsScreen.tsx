@@ -111,7 +111,7 @@ export function ProjectsScreen() {
             const items = list.filter((p) => p.status === st.id && visible(p))
             return (
               <Column key={st.id} status={st.id} title={st.title} items={items}>
-                <AddItem label="Проект" onAdd={(t) => addProject(t, st.id)} />
+                <AddItem label="Проект" onAdd={(t) => addProject(t, st.id, filter)} />
                 {st.id === 'done' && archived.length > 0 && (
                   <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
                     {showArchive ? 'Скрыть архив' : `Архив · ${archived.length}`}
@@ -199,7 +199,7 @@ function SortableCard({ project }: { project: Project }) {
   )
 }
 
-function Card({ project, overlay, archived }: { project: Project; overlay?: boolean; archived?: boolean }) {
+export function Card({ project, overlay, archived }: { project: Project; overlay?: boolean; archived?: boolean }) {
   const sphere = useStore((s) => s.spheres.find((x) => x.id === project.sphereId))
   const next = project.tasks.find((t) => !t.done)
   const doneCount = project.tasks.filter((t) => t.done).length
