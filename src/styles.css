@@ -31,7 +31,9 @@
 
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
-body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+/* the page itself never scrolls (only lists inside do), so the tab bar can't be pushed off screen */
+html, body { overflow: hidden; }
+body { position: fixed; inset: 0; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button {
   background: var(--panel-2);
