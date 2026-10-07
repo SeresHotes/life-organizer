@@ -16,6 +16,9 @@ import { navigate } from '../hooks'
 import { AddItem } from '../components/AddItem'
 import { useItemSensors, vibrate } from '../components/SortableList'
 
+/** Gentle auto-scroll: only very close to the edge and slowly (defaults are 20% of the width and 10x speed). */
+const AUTO_SCROLL = { threshold: { x: 0.08, y: 0.1 }, acceleration: 2 }
+
 const isStatus = (id: unknown): id is Status => STATUSES.some((s) => s.id === id)
 
 /** Prefer the card under the pointer, then the column under the pointer, then the nearest thing. */
@@ -89,6 +92,7 @@ export function ProjectsScreen() {
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
+        autoScroll={AUTO_SCROLL}
         onDragStart={({ active }) => {
           vibrate()
           setDraft(projects)
@@ -101,7 +105,7 @@ export function ProjectsScreen() {
           setActiveId(null)
         }}
       >
-        <div className="board">
+        <div className={'board' + (activeId ? ' is-dragging' : '')}>
           {STATUSES.map((st) => {
             const items = list.filter((p) => p.status === st.id && visible(p))
             return (

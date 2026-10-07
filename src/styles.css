@@ -308,3 +308,6 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
 .color-input { width: 34px; height: 34px; padding: 2px; flex: none; }
 .cards { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
 .link-btn.block { display: block; margin-top: 12px; font-size: 0.95rem; }
+
+/* scroll snapping fights auto-scroll while a card is dragged */
+.board.is-dragging { scroll-snap-type: none; }
