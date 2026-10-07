@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore, type Project } from '../store'
+import { ON_MAIN_SCREEN, useStore, type Project } from '../store'
 import { useToday, navigate } from '../hooks'
 import { Section } from '../components/Section'
 import { ItemRow } from '../components/ItemRow'
@@ -55,9 +55,9 @@ function Notes() {
 function Routines() {
   const s = useStore()
   const today = useToday()
-  // routines of projects in progress are shown here too
+  // routines of active projects are shown here too
   const projectRoutines = s.projects
-    .filter((p) => p.status === 'progress')
+    .filter((p) => ON_MAIN_SCREEN.includes(p.status))
     .flatMap((p) => p.routines.map((r) => ({ project: p, routine: r })))
   const projectOpen = projectRoutines.filter(({ routine: r }) => r.doneOn !== today)
   const projectDone = projectRoutines.filter(({ routine: r }) => r.doneOn === today)
@@ -86,7 +86,7 @@ function Routines() {
 function Tasks() {
   const s = useStore()
   const projectTasks = s.projects
-    .filter((p) => p.status === 'progress')
+    .filter((p) => ON_MAIN_SCREEN.includes(p.status))
     .flatMap((p) => {
       const t = p.tasks.find((x) => !x.done)
       return t ? [{ project: p, task: t }] : []

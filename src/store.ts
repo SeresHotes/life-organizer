@@ -26,6 +26,9 @@ export const STATUSES: { id: Status; title: string }[] = [
   { id: 'done', title: 'Готово' },
 ]
 
+/** Projects whose first open task and routines are shown on the main screen. */
+export const ON_MAIN_SCREEN: Status[] = ['open', 'progress']
+
 export const ARCHIVE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
 
 export const isArchived = (p: Project, now = Date.now()) =>
