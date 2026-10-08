@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type Owner, type Routine, type Task } from '../store'
+import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type NoteKind, type Owner, type Routine, type Task } from '../store'
 import { useRoutineDone } from '../hooks'
 import { SortableList } from './SortableList'
 import { IntervalChips, ItemRow } from './ItemRow'
@@ -101,11 +101,15 @@ export function RoutineList({ owner = null, filter = pass }: ListProps<Routine>)
   )
 }
 
-/** Notes: active ones, or archived ones (show='done'). */
-export function NoteList({ filter = pass, show = 'open' }: Omit<ListProps<Note>, 'owner'>) {
+/** Notes or thoughts: active ones, or archived ones (show='done'). */
+export function NoteList({
+  filter = pass,
+  show = 'open',
+  kind = 'note',
+}: Omit<ListProps<Note>, 'owner'> & { kind?: NoteKind }) {
   const s = useStore()
   const archived = show === 'done'
-  const notes = s.notes.filter((n) => n.archived === archived && filter(n))
+  const notes = s.notes.filter((n) => n.kind === kind && n.archived === archived && filter(n))
   return (
     <SortableList
       items={notes}

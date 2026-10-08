@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ON_MAIN_SCREEN, moveKey, sortByOrder, useStore, type Project, type Routine, type Task } from '../store'
+import { ON_MAIN_SCREEN, moveKey, sortByOrder, useStore, type NoteKind, type Project, type Routine, type Task } from '../store'
 import { useRoutineDone, navigate } from '../hooks'
 import { Section } from '../components/Section'
 import { SortableList } from '../components/SortableList'
@@ -9,7 +9,8 @@ import { NoteList, RoutineRow, TaskList, TaskRow } from '../components/Lists'
 export function MainScreen() {
   return (
     <div className="main-screen">
-      <Notes />
+      <Notes kind="note" />
+      <Notes kind="thought" />
       <Routines />
       <Tasks />
     </div>
@@ -33,25 +34,34 @@ export function ProjectBadge({ project }: { project: Project }) {
   )
 }
 
-function Notes() {
+function Notes({ kind }: { kind: NoteKind }) {
   const s = useStore()
   const [showArchive, setShowArchive] = useState(false)
-  const open = s.notes.filter((n) => !n.archived).length
-  const archived = s.notes.length - open
+  const all = s.notes.filter((n) => n.kind === kind)
+  const open = all.filter((n) => !n.archived).length
+  const archived = all.length - open
+  const thought = kind === 'thought'
   return (
     <Section
-      id="notes"
-      title="Заметки"
+      id={thought ? 'thoughts' : 'notes'}
+      title={thought ? 'Мысли' : 'Заметки'}
       count={open}
-      add={(close) => <AddForm label="Новая заметка" withSphere onAdd={(t, sp) => s.addNote(t, sp)} onClose={close} />}
+      add={(close) => (
+        <AddForm
+          label={thought ? 'Новая мысль' : 'Новая заметка'}
+          withSphere
+          onAdd={(t, sp) => s.addNote(t, sp, kind)}
+          onClose={close}
+        />
+      )}
     >
-      <NoteList />
+      <NoteList kind={kind} />
       {archived > 0 && (
         <button className="link-btn" onClick={() => setShowArchive(!showArchive)}>
           {showArchive ? 'Скрыть архив' : `Архив · ${archived}`}
         </button>
       )}
-      {showArchive && <NoteList show="done" />}
+      {showArchive && <NoteList kind={kind} show="done" />}
     </Section>
   )
 }

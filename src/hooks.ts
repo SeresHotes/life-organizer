@@ -37,3 +37,18 @@ export function useRoute() {
 export const navigate = (path: string) => {
   window.location.hash = '/' + path
 }
+
+/** Whether a CSS media query matches, updated live. */
+export function useMediaQuery(query: string) {
+  return useSyncExternalStore(
+    (cb) => {
+      const m = matchMedia(query)
+      m.addEventListener('change', cb)
+      return () => m.removeEventListener('change', cb)
+    },
+    () => matchMedia(query).matches,
+  )
+}
+
+/** Wide screens show all main-screen lists side by side; narrow ones use an accordion. */
+export const WIDE = '(min-width: 900px)'

@@ -2,7 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type Task = { id: string; text: string; done: boolean; sphereId: string | null }
-export type Note = { id: string; text: string; archived: boolean; sphereId: string | null }
+/** Free text without a checkbox; `kind` separates notes from thoughts (same behaviour, separate lists). */
+export type NoteKind = 'note' | 'thought'
+export type Note = { id: string; text: string; archived: boolean; sphereId: string | null; kind: NoteKind }
 /** `interval` — hours until a done routine opens again (24 and more are whole days, counted from the day start). */
 export type Routine = {
   id: string
@@ -122,6 +124,8 @@ export type Data = {
 
 type UI = {
   collapsed: Record<string, boolean>
+  /** Main screen section expanded on narrow screens (accordion). */
+  expanded: string
   sphereFilter: string | null
 }
 
@@ -130,7 +134,7 @@ export type Owner = string | null
 
 type Actions = {
   // notes
-  addNote: (text: string, sphereId?: string | null) => void
+  addNote: (text: string, sphereId?: string | null, kind?: NoteKind) => void
   updateNote: (id: string, patch: Partial<Omit<Note, 'id'>>) => void
   deleteNote: (id: string) => void
   toggleNoteArchived: (id: string) => void
@@ -161,6 +165,7 @@ type Actions = {
   setMainOrder: (list: 'tasks' | 'routines', keys: string[]) => void
   setDayStartHour: (h: number) => void
   toggleCollapsed: (key: string) => void
+  setExpanded: (key: string) => void
   setSphereFilter: (id: string | null) => void
   importData: (data: Data) => void
 }
@@ -201,7 +206,7 @@ function normalize(data: Partial<Data>): Data {
     ...initialData,
     ...data,
     mainOrder: { ...initialData.mainOrder, ...data.mainOrder },
-    notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false })),
+    notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false, kind: n.kind ?? 'note' })),
     routines: (data.routines ?? []).map(routine),
     tasks: (data.tasks ?? []).map(sph),
     projects: (data.projects ?? []).map((p) => ({
@@ -227,10 +232,11 @@ export const useStore = create<State>()(
       return {
         ...initialData,
         collapsed: {},
+        expanded: 'tasks',
         sphereFilter: null,
 
-        addNote: (text, sphereId = null) =>
-          set((s) => ({ notes: [{ id: uid(), text, archived: false, sphereId }, ...s.notes] })),
+        addNote: (text, sphereId = null, kind = 'note') =>
+          set((s) => ({ notes: [{ id: uid(), text, archived: false, sphereId, kind }, ...s.notes] })),
         updateNote: (id, patch) => set((s) => ({ notes: s.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
         deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
         toggleNoteArchived: (id) =>
@@ -239,7 +245,10 @@ export const useStore = create<State>()(
             return n ? { notes: moveToEnd(s.notes, id, { archived: !n.archived }) } : {}
           }),
         reorderNotes: (a, o, archived) =>
-          set((s) => ({ notes: reorderWithin(s.notes, (n) => n.archived === archived, a, o) })),
+          set((s) => {
+            const kind = s.notes.find((n) => n.id === a)?.kind
+            return { notes: reorderWithin(s.notes, (n) => n.archived === archived && n.kind === kind, a, o) }
+          }),
 
         addRoutine: (owner, text, sphereId = null, interval = 24) =>
           editList('routines', owner, (l) => [{ id: uid(), text, doneOn: null, doneAt: 0, sphereId, interval }, ...l]),
@@ -343,6 +352,7 @@ export const useStore = create<State>()(
             return { mainOrder, routines: [...s.routines].sort(byPos) }
           }),
         setDayStartHour: (h) => set({ dayStartHour: h }),
+        setExpanded: (key) => set({ expanded: key }),
         toggleCollapsed: (key) => set((s) => ({ collapsed: { ...s.collapsed, [key]: !s.collapsed[key] } })),
         setSphereFilter: (id) => set({ sphereFilter: id }),
         importData: (data) => set(normalize(data)),
@@ -350,7 +360,7 @@ export const useStore = create<State>()(
     },
     {
       name: 'life-organizer',
-      version: 3,
+      version: 4,
       migrate: (persisted) => {
         const s = persisted as Partial<State>
         return { ...s, ...normalize(s) } as State

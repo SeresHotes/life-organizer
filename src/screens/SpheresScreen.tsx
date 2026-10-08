@@ -40,7 +40,8 @@ function SphereTile({ sphere }: { sphere: Sphere }) {
   const mine = <T extends { sphereId: string | null }>(x: T) => x.sphereId === sphere.id
   const projects = s.projects.filter((p) => mine(p) && p.status !== 'done').length
   const tasks = s.tasks.filter((t) => mine(t) && !t.done).length
-  const notes = s.notes.filter((n) => mine(n) && !n.archived).length
+  const notes = s.notes.filter((n) => mine(n) && n.kind === 'note' && !n.archived).length
+  const thoughts = s.notes.filter((n) => mine(n) && n.kind === 'thought' && !n.archived).length
   const routines = s.routines.filter((r) => mine(r) && !isDone(r)).length
   return (
     <button className="sphere-tile" style={{ borderLeftColor: sphere.color }} onClick={() => navigate('sphere/' + sphere.id)}>
@@ -50,6 +51,7 @@ function SphereTile({ sphere }: { sphere: Sphere }) {
         <span>Задачи {tasks}</span>
         <span>Рутина {routines}</span>
         <span>Заметки {notes}</span>
+        <span>Мысли {thoughts}</span>
       </div>
     </button>
   )
@@ -122,6 +124,10 @@ export function SphereScreen({ id }: { id: string }) {
       <AddItem label="Новая заметка" onAdd={(t) => s.addNote(t, id)} />
       <NoteList filter={mine} />
 
+      <h3>Мысли</h3>
+      <AddItem label="Новая мысль" onAdd={(t) => s.addNote(t, id, 'thought')} />
+      <NoteList kind="thought" filter={mine} />
+
       <button className="link-btn block" onClick={() => setShowDone(!showDone)}>
         {showDone ? '▾' : '▸'} Завершённое · {doneTasks + doneProjects.length}
       </button>
@@ -147,6 +153,7 @@ export function SphereScreen({ id }: { id: string }) {
             ))}
           </div>
           <NoteList filter={mine} show="done" />
+          <NoteList kind="thought" filter={mine} show="done" />
         </>
       )}
 
