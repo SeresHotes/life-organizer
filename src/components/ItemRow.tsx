@@ -162,12 +162,12 @@ export function SphereChips({ value, onChange }: { value: string | null; onChang
   )
 }
 
-/** Interval picker for routines: 1ч, 6ч, 1д … 7д. */
-export function IntervalChips({ value, onChange }: { value: number; onChange: (h: number) => void }) {
+/** Interval picker for routines: 1ч, 6ч, 1д … 7д; `optional` adds "Нет" (value 0) — a one-off task. */
+export function IntervalChips({ value, onChange, optional }: { value: number; onChange: (h: number) => void; optional?: boolean }) {
   return (
     <div className="sphere-chips interval-chips">
       <span className="chips-label">Повтор</span>
-      {INTERVALS.map((h) => (
+      {(optional ? [0, ...INTERVALS] : INTERVALS).map((h) => (
         <button
           key={h}
           type="button"
@@ -175,7 +175,7 @@ export function IntervalChips({ value, onChange }: { value: number; onChange: (h
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => onChange(h)}
         >
-          {intervalLabel(h)}
+          {h === 0 ? 'Нет' : intervalLabel(h)}
         </button>
       ))}
     </div>

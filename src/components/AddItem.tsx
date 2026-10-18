@@ -6,8 +6,8 @@ type FormProps = {
   onAdd: (text: string, sphereId: string | null, interval: number) => void
   /** Show a sphere picker for the new item. */
   withSphere?: boolean
-  /** Show a repeat interval picker (routines). */
-  withInterval?: boolean
+  /** Show a repeat interval picker (routines); 'optional' starts at "no repeat" (interval 0) — a task. */
+  withInterval?: boolean | 'optional'
   /** Sphere preselected in the picker. */
   defaultSphere?: string | null
   onClose: () => void
@@ -17,7 +17,7 @@ type FormProps = {
 export function AddForm({ label, onAdd, withSphere, withInterval, defaultSphere = null, onClose }: FormProps) {
   const [value, setValue] = useState('')
   const [sphereId, setSphereId] = useState<string | null>(defaultSphere)
-  const [interval, setInterval] = useState(24)
+  const [interval, setInterval] = useState(withInterval === 'optional' ? 0 : 24)
   const ref = useRef<HTMLTextAreaElement>(null)
   // layout effect runs in the same tap handler, so mobile browsers open the keyboard
   useLayoutEffect(() => ref.current?.focus(), [])
@@ -47,7 +47,7 @@ export function AddForm({ label, onAdd, withSphere, withInterval, defaultSphere 
           onClose()
         }}
       />
-      {withInterval && <IntervalChips value={interval} onChange={setInterval} />}
+      {withInterval && <IntervalChips value={interval} onChange={setInterval} optional={withInterval === 'optional'} />}
       {withSphere && (
         <div className="edit-tools">
           <SphereChips value={sphereId} onChange={setSphereId} />

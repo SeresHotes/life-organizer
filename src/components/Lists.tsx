@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type NoteKind, type Owner, type Routine, type Task } from '../store'
-import { useRoutineDone } from '../hooks'
+import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type NoteKind, type Owner, type Project, type Routine, type Task } from '../store'
+import { navigate, useRoutineDone } from '../hooks'
 import { SortableList } from './SortableList'
 import { IntervalChips, ItemRow } from './ItemRow'
 
@@ -15,6 +15,23 @@ type ListProps<T> = {
 }
 
 const pass = () => true
+
+/** Small project label shown on project items; tapping it opens the project. */
+export function ProjectBadge({ project }: { project: Project }) {
+  const color = useStore((s) => s.spheres.find((x) => x.id === project.sphereId)?.color)
+  return (
+    <span
+      className="badge"
+      style={{ borderColor: color }}
+      onClick={(e) => {
+        e.stopPropagation()
+        navigate('project/' + project.id)
+      }}
+    >
+      {project.title}
+    </span>
+  )
+}
 
 /** A task of the main screen (owner=null) or of a project; `badge` marks project tasks shown elsewhere. */
 export function TaskRow({ owner, task: t, badge }: { owner: Owner; task: Task; badge?: ReactNode }) {

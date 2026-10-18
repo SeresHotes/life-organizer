@@ -107,6 +107,12 @@ export function reorderWithin<T extends { id: string }>(
   return arr.map((x) => (inSection(x) ? moved[i++] : x))
 }
 
+/**
+ * A task or routine chosen for a day. Text and done state are copies, kept in sync while the day is today,
+ * so past days stay readable after items are edited, closed or deleted.
+ */
+export type PlanItem = { id: string; type: 'task' | 'routine'; owner: Owner; text: string; done: boolean }
+
 export type Data = {
   notes: Note[]
   routines: Routine[]
@@ -120,12 +126,14 @@ export type Data = {
    * routines: routine ids (own and projects').
    */
   mainOrder: { tasks: string[]; routines: string[] }
+  /** Day plans by day key (YYYY-MM-DD). Nothing carries over: each day is planned anew. */
+  days: Record<string, PlanItem[]>
 }
 
 type UI = {
   collapsed: Record<string, boolean>
-  /** Main screen section expanded on narrow screens (accordion). */
-  expanded: string
+  /** Section expanded on narrow screens (accordion), per screen. */
+  expanded: Record<string, string>
   sphereFilter: string | null
 }
 
@@ -140,18 +148,23 @@ type Actions = {
   toggleNoteArchived: (id: string) => void
   reorderNotes: (activeId: string, overId: string, archived: boolean) => void
   // routines (main screen or project)
-  addRoutine: (owner: Owner, text: string, sphereId?: string | null, interval?: number) => void
+  addRoutine: (owner: Owner, text: string, sphereId?: string | null, interval?: number) => string
   updateRoutine: (owner: Owner, id: string, patch: Partial<Omit<Routine, 'id'>>) => void
   deleteRoutine: (owner: Owner, id: string) => void
   toggleRoutine: (owner: Owner, id: string) => void
   reorderRoutines: (owner: Owner, activeId: string, overId: string) => void
   // tasks (main screen or project)
-  addTask: (owner: Owner, text: string, sphereId?: string | null) => void
+  addTask: (owner: Owner, text: string, sphereId?: string | null) => string
   updateTask: (owner: Owner, id: string, patch: Partial<Omit<Task, 'id'>>) => void
   deleteTask: (owner: Owner, id: string) => void
   toggleTask: (owner: Owner, id: string) => void
   reorderTasks: (owner: Owner, activeId: string, overId: string, done: boolean) => void
   clearDoneTasks: () => void
+  // today's plan
+  planAdd: (item: Omit<PlanItem, 'done'>, done?: boolean) => void
+  planRemove: (id: string) => void
+  planToggleDone: (id: string) => void
+  planReorder: (activeId: string, overId: string) => void
   // projects
   addProject: (title: string, status: Status, sphereId?: string | null) => string
   updateProject: (id: string, patch: Partial<Omit<Project, 'id' | 'tasks' | 'routines'>>) => void
@@ -165,7 +178,7 @@ type Actions = {
   setMainOrder: (list: 'tasks' | 'routines', keys: string[]) => void
   setDayStartHour: (h: number) => void
   toggleCollapsed: (key: string) => void
-  setExpanded: (key: string) => void
+  setExpanded: (group: string, key: string) => void
   setSphereFilter: (id: string | null) => void
   importData: (data: Data) => void
 }
@@ -180,6 +193,7 @@ const initialData: Data = {
   spheres: [],
   dayStartHour: 4,
   mainOrder: { tasks: [], routines: [] },
+  days: {},
 }
 
 /** Stable sort by position in `order`; items not in it (new ones) go first. */
@@ -206,6 +220,7 @@ function normalize(data: Partial<Data>): Data {
     ...initialData,
     ...data,
     mainOrder: { ...initialData.mainOrder, ...data.mainOrder },
+    days: data.days ?? {},
     notes: (data.notes ?? []).map((n) => ({ ...sph(n), archived: n.archived ?? false, kind: n.kind ?? 'note' })),
     routines: (data.routines ?? []).map(routine),
     tasks: (data.tasks ?? []).map(sph),
@@ -223,6 +238,27 @@ export const useStore = create<State>()(
       const mapProject = (pid: string, fn: (p: Project) => Project) =>
         set((s) => ({ projects: s.projects.map((p) => (p.id === pid ? fn(p) : p)) }))
 
+      /** Tasks/routines list of the main screen or of a project. */
+      const listOf = <K extends 'tasks' | 'routines'>(key: K, owner: Owner): Data[K] =>
+        owner === null ? get()[key] : ((get().projects.find((p) => p.id === owner)?.[key] ?? []) as Data[K])
+
+      /** Applies `fn` to today's plan. */
+      const editToday = (fn: (items: PlanItem[]) => PlanItem[]) =>
+        set((s) => {
+          const key = dayKey(s.dayStartHour)
+          return { days: { ...s.days, [key]: fn(s.days[key] ?? []) } }
+        })
+      /** Keeps today's copy of a task/routine in sync with the item itself. */
+      const syncToday = (id: string, patch: Partial<PlanItem>) => {
+        const key = dayKey(get().dayStartHour)
+        if (get().days[key]?.some((x) => x.id === id)) editToday((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+      }
+      const syncText = (id: string, patch: { text?: string }) => patch.text !== undefined && syncToday(id, { text: patch.text })
+      const dropFromToday = (id: string) => {
+        const key = dayKey(get().dayStartHour)
+        if (get().days[key]?.some((x) => x.id === id)) editToday((l) => l.filter((x) => x.id !== id))
+      }
+
       /** Applies `fn` to the tasks/routines list of the main screen or of a project. */
       function editList<K extends 'tasks' | 'routines'>(key: K, owner: Owner, fn: (list: Data[K]) => Data[K]) {
         if (owner === null) set((s) => ({ [key]: fn(s[key]) }) as Partial<State>)
@@ -232,7 +268,7 @@ export const useStore = create<State>()(
       return {
         ...initialData,
         collapsed: {},
-        expanded: 'tasks',
+        expanded: {},
         sphereFilter: null,
 
         addNote: (text, sphereId = null, kind = 'note') =>
@@ -250,11 +286,19 @@ export const useStore = create<State>()(
             return { notes: reorderWithin(s.notes, (n) => n.archived === archived && n.kind === kind, a, o) }
           }),
 
-        addRoutine: (owner, text, sphereId = null, interval = 24) =>
-          editList('routines', owner, (l) => [{ id: uid(), text, doneOn: null, doneAt: 0, sphereId, interval }, ...l]),
-        updateRoutine: (owner, id, patch) =>
-          editList('routines', owner, (l) => l.map((r) => (r.id === id ? { ...r, ...patch } : r))),
-        deleteRoutine: (owner, id) => editList('routines', owner, (l) => l.filter((r) => r.id !== id)),
+        addRoutine: (owner, text, sphereId = null, interval = 24) => {
+          const id = uid()
+          editList('routines', owner, (l) => [{ id, text, doneOn: null, doneAt: 0, sphereId, interval }, ...l])
+          return id
+        },
+        updateRoutine: (owner, id, patch) => {
+          editList('routines', owner, (l) => l.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+          syncText(id, patch)
+        },
+        deleteRoutine: (owner, id) => {
+          editList('routines', owner, (l) => l.filter((r) => r.id !== id))
+          dropFromToday(id)
+        },
         toggleRoutine: (owner, id) => {
           const { dayStartHour } = get()
           const now = Date.now()
@@ -267,6 +311,8 @@ export const useStore = create<State>()(
                   : { ...r, doneOn: dayKey(dayStartHour), doneAt: now },
             ),
           )
+          const r = listOf('routines', owner).find((x) => x.id === id)
+          if (r) syncToday(id, { done: isRoutineDone(r, now, dayStartHour) })
         },
         reorderRoutines: (owner, a, o) => {
           const { dayStartHour } = get()
@@ -274,25 +320,55 @@ export const useStore = create<State>()(
           editList('routines', owner, (l) => reorderWithin(l, (r) => !isRoutineDone(r, now, dayStartHour), a, o))
         },
 
-        addTask: (owner, text, sphereId = null) =>
+        addTask: (owner, text, sphereId = null) => {
+          const id = uid()
           editList('tasks', owner, (l) => {
-            const task = { id: uid(), text, done: false, sphereId }
+            const task = { id, text, done: false, sphereId }
             if (owner === null) return [task, ...l]
             // in a project tasks go in plan order: a new one goes after the last open task
             const open = l.filter((t) => !t.done)
             return [...open, task, ...l.filter((t) => t.done)]
-          }),
-        updateTask: (owner, id, patch) =>
-          editList('tasks', owner, (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t))),
-        deleteTask: (owner, id) => editList('tasks', owner, (l) => l.filter((t) => t.id !== id)),
-        toggleTask: (owner, id) =>
+          })
+          return id
+        },
+        updateTask: (owner, id, patch) => {
+          editList('tasks', owner, (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+          syncText(id, patch)
+        },
+        deleteTask: (owner, id) => {
+          editList('tasks', owner, (l) => l.filter((t) => t.id !== id))
+          dropFromToday(id)
+        },
+        toggleTask: (owner, id) => {
           editList('tasks', owner, (l) => {
             const t = l.find((x) => x.id === id)
             return t ? moveToEnd(l, id, { done: !t.done }) : l
-          }),
+          })
+          const t = listOf('tasks', owner).find((x) => x.id === id)
+          if (t) syncToday(id, { done: t.done })
+        },
         reorderTasks: (owner, a, o, done) =>
           editList('tasks', owner, (l) => reorderWithin(l, (t) => t.done === done, a, o)),
         clearDoneTasks: () => set((s) => ({ tasks: s.tasks.filter((t) => !t.done) })),
+
+        planAdd: (item, done = false) =>
+          editToday((l) => (l.some((x) => x.id === item.id) ? l : [...l, { ...item, done }])),
+        planRemove: (id) => editToday((l) => l.filter((x) => x.id !== id)),
+        planToggleDone: (id) => {
+          const { days, dayStartHour } = get()
+          const item = days[dayKey(dayStartHour)]?.find((x) => x.id === id)
+          if (!item) return
+          if (item.type === 'task') {
+            if (listOf('tasks', item.owner).some((t) => t.id === id)) get().toggleTask(item.owner, id)
+            else syncToday(id, { done: !item.done })
+            return
+          }
+          const r = listOf('routines', item.owner).find((x) => x.id === id)
+          // a routine done today may have reopened already (hourly ones): then only the day's mark is undone
+          if (r && (isRoutineDone(r, Date.now(), dayStartHour) || !item.done)) get().toggleRoutine(item.owner, id)
+          else syncToday(id, { done: !item.done })
+        },
+        planReorder: (a, o) => editToday((l) => reorderWithin(l, () => true, a, o)),
 
         addProject: (title, status, sphereId = null) => {
           const id = uid()
@@ -352,7 +428,7 @@ export const useStore = create<State>()(
             return { mainOrder, routines: [...s.routines].sort(byPos) }
           }),
         setDayStartHour: (h) => set({ dayStartHour: h }),
-        setExpanded: (key) => set({ expanded: key }),
+        setExpanded: (group, key) => set((s) => ({ expanded: { ...s.expanded, [group]: key } })),
         toggleCollapsed: (key) => set((s) => ({ collapsed: { ...s.collapsed, [key]: !s.collapsed[key] } })),
         setSphereFilter: (id) => set({ sphereFilter: id }),
         importData: (data) => set(normalize(data)),
@@ -360,10 +436,12 @@ export const useStore = create<State>()(
     },
     {
       name: 'life-organizer',
-      version: 4,
+      version: 5,
       migrate: (persisted) => {
         const s = persisted as Partial<State>
-        return { ...s, ...normalize(s) } as State
+        // `expanded` used to be a single key for the main screen
+        const expanded = typeof s.expanded === 'object' ? s.expanded : {}
+        return { ...s, ...normalize(s), expanded } as State
       },
     },
   ),
@@ -377,4 +455,5 @@ export const pickData = (s: State): Data => ({
   spheres: s.spheres,
   dayStartHour: s.dayStartHour,
   mainOrder: s.mainOrder,
+  days: s.days,
 })

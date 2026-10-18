@@ -4,11 +4,15 @@ import { ProjectsScreen } from './screens/ProjectsScreen'
 import { ProjectScreen } from './screens/ProjectScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { SpheresScreen, SphereScreen } from './screens/SpheresScreen'
+import { TasksScreen } from './screens/TasksScreen'
+import { ThoughtsScreen } from './screens/ThoughtsScreen'
 
 export function App() {
   const [screen, arg] = useRoute()
   let content
-  if (screen === 'projects') content = <ProjectsScreen />
+  if (screen === 'tasks') content = <TasksScreen />
+  else if (screen === 'thoughts') content = <ThoughtsScreen />
+  else if (screen === 'projects') content = <ProjectsScreen />
   else if (screen === 'project' && arg) content = <ProjectScreen id={arg} />
   else if (screen === 'spheres') content = <SpheresScreen />
   else if (screen === 'sphere' && arg) content = <SphereScreen id={arg} />
@@ -19,7 +23,9 @@ export function App() {
     <div className="app">
       <main className="content">{content}</main>
       <nav className="tabbar">
-        <Tab id="" current={tab} icon="☰" label="Главная" />
+        <Tab id="" current={tab} icon="☀" label="Сегодня" />
+        <Tab id="tasks" current={tab} icon="☑" label="Задачи" />
+        <Tab id="thoughts" current={tab} icon="✎" label="Мысли" />
         <Tab id="projects" current={tab} icon="▦" label="Проекты" />
         <Tab id="spheres" current={tab} icon="◐" label="Сферы" />
         <Tab id="settings" current={tab} icon="⚙" label="Настройки" />
