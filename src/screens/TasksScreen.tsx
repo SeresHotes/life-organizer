@@ -1,6 +1,6 @@
 import { ON_MAIN_SCREEN, moveKey, sortByOrder, taskOrder, useStore, type Project, type Routine, type Task } from '../store'
 import { useRoutineDone } from '../hooks'
-import { Section } from '../components/Section'
+import { ListScreen } from '../components/ListScreen'
 import { SortableList } from '../components/SortableList'
 import { AddForm } from '../components/AddItem'
 import { ProjectBadge, RoutineRow, TaskList, TaskRow } from '../components/Lists'
@@ -47,37 +47,33 @@ export function TasksScreen() {
     )
   }
   return (
-    <div className="main-screen">
-      <Section
-        group="tasks"
-        id="tasks"
-        defaultExpanded
-        title="Задачи"
-        count={open.length}
-        add={(close) => (
-          <AddForm
-            label="Новая задача"
-            withSphere
-            withInterval="optional"
-            onAdd={(t, sp, interval) => (interval ? s.addRoutine(null, t, sp, interval) : s.addTask(null, t, sp))}
-            onClose={close}
-          />
-        )}
-      >
-        <SortableList
-          items={open}
-          onReorder={(a, o) => s.setMainOrder('tasks', moveKey(open.map((e) => e.id), a, o))}
-          render={row}
+    <ListScreen
+      title="Задачи"
+      count={open.length}
+      addLabel="+ Задача"
+      add={(close) => (
+        <AddForm
+          label="Новая задача"
+          withSphere
+          withInterval="optional"
+          onAdd={(t, sp, interval) => (interval ? s.addRoutine(null, t, sp, interval) : s.addTask(null, t, sp))}
+          onClose={close}
         />
-        <SortableList items={resting} render={row} />
-        {done.length > 0 && <div className="divider">Выполнено · {done.length}</div>}
-        <TaskList show="done" />
-        {done.length > 0 && (
-          <button className="link-btn" onClick={() => confirm('Удалить все выполненные задачи?') && s.clearDoneTasks()}>
-            Очистить выполненные
-          </button>
-        )}
-      </Section>
-    </div>
+      )}
+    >
+      <SortableList
+        items={open}
+        onReorder={(a, o) => s.setMainOrder('tasks', moveKey(open.map((e) => e.id), a, o))}
+        render={row}
+      />
+      <SortableList items={resting} render={row} />
+      {done.length > 0 && <div className="divider">Выполнено · {done.length}</div>}
+      <TaskList show="done" />
+      {done.length > 0 && (
+        <button className="link-btn" onClick={() => confirm('Удалить все выполненные задачи?') && s.clearDoneTasks()}>
+          Очистить выполненные
+        </button>
+      )}
+    </ListScreen>
   )
 }

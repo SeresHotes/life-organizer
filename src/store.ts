@@ -132,9 +132,6 @@ export type Data = {
 }
 
 type UI = {
-  collapsed: Record<string, boolean>
-  /** Section expanded on narrow screens (accordion), per screen. */
-  expanded: Record<string, string>
   sphereFilter: string | null
 }
 
@@ -178,8 +175,6 @@ type Actions = {
   // misc
   setMainOrder: (list: 'tasks' | 'routines', keys: string[]) => void
   setDayStartHour: (h: number) => void
-  toggleCollapsed: (key: string) => void
-  setExpanded: (group: string, key: string) => void
   setSphereFilter: (id: string | null) => void
   importData: (data: Data) => void
 }
@@ -274,8 +269,6 @@ export const useStore = create<State>()(
 
       return {
         ...initialData,
-        collapsed: {},
-        expanded: {},
         sphereFilter: null,
 
         addNote: (text, sphereId = null, kind = 'note') =>
@@ -436,8 +429,6 @@ export const useStore = create<State>()(
             return { mainOrder, routines: [...s.routines].sort(byPos) }
           }),
         setDayStartHour: (h) => set({ dayStartHour: h }),
-        setExpanded: (group, key) => set((s) => ({ expanded: { ...s.expanded, [group]: key } })),
-        toggleCollapsed: (key) => set((s) => ({ collapsed: { ...s.collapsed, [key]: !s.collapsed[key] } })),
         setSphereFilter: (id) => set({ sphereFilter: id }),
         importData: (data) => set(normalize(data)),
       }
@@ -447,9 +438,7 @@ export const useStore = create<State>()(
       version: 5,
       migrate: (persisted) => {
         const s = persisted as Partial<State>
-        // `expanded` used to be a single key for the main screen
-        const expanded = typeof s.expanded === 'object' ? s.expanded : {}
-        return { ...s, ...normalize(s), expanded } as State
+        return { ...s, ...normalize(s) } as State
       },
     },
   ),
