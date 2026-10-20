@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ON_MAIN_SCREEN, dayKey, intervalLabel, routineReopenAt, shortLeft, sortByOrder, useStore, type PlanItem, type Project, type Routine, type State } from '../store'
+import { ON_MAIN_SCREEN, dayKey, intervalLabel, routineReopenAt, shortLeft, sortByOrder, taskOrder, useStore, type PlanItem, type Project, type Routine, type State } from '../store'
 import { useNow, useRoutineDone } from '../hooks'
 import { SortableList } from '../components/SortableList'
 import { AddForm, AddItem } from '../components/AddItem'
 import { ItemRow } from '../components/ItemRow'
-import { ProjectBadge } from '../components/Lists'
+import { NoteList, ProjectBadge } from '../components/Lists'
 
-/** Today's plan: only the tasks and routines picked for today. Past days can be browsed but aren't carried over. */
+/** Notes on top, then today's plan: only the tasks and routines picked for today. Past days can be browsed but aren't carried over. */
 export function MainScreen() {
   const s = useStore()
   const now = useNow()
@@ -38,6 +38,8 @@ export function MainScreen() {
 
   return (
     <div className="today-screen">
+      <TodayNotes />
+
       <div className="day-nav">
         <button className="icon-btn" disabled={!prev} onClick={() => setViewed(prev!)} aria-label="Предыдущий день">
           ‹
@@ -104,7 +106,7 @@ export function MainScreen() {
         {isToday ? (
           <>
             <button className="primary" onClick={() => setAdding('task')}>
-              + Задача
+              + На сегодня
             </button>
             <button onClick={() => setAdding('thought')}>+ Мысль</button>
             <button onClick={() => setPicking(true)}>☰ Выбрать</button>
@@ -112,6 +114,36 @@ export function MainScreen() {
         ) : (
           <button onClick={() => setViewed(null)}>К сегодня</button>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Notes: always at hand, independent of the day. */
+function TodayNotes() {
+  const s = useStore()
+  const [adding, setAdding] = useState(false)
+  const [showArchive, setShowArchive] = useState(false)
+  const archived = s.notes.filter((n) => n.kind === 'note' && n.archived).length
+  return (
+    <div className="today-notes">
+      <div className="today-notes-head">
+        <span className="section-title">Заметки</span>
+        <button className="add-icon small" aria-label="Добавить заметку" onClick={() => setAdding(true)}>
+          +
+        </button>
+      </div>
+      <div className="today-notes-body">
+        {adding && (
+          <AddForm label="Новая заметка" withSphere onAdd={(t, sp) => s.addNote(t, sp, 'note')} onClose={() => setAdding(false)} />
+        )}
+        <NoteList kind="note" />
+        {archived > 0 && (
+          <button className="link-btn small" onClick={() => setShowArchive(!showArchive)}>
+            {showArchive ? 'Скрыть архив' : `Архив · ${archived}`}
+          </button>
+        )}
+        {showArchive && <NoteList kind="note" show="done" />}
       </div>
     </div>
   )
@@ -210,20 +242,22 @@ function DayPicker({ today, onDone }: { today: string; onDone: () => void }) {
     planned.has(item.id) ? s.planRemove(item.id) : s.planAdd(item, done)
 
   const active = s.projects.filter((p) => ON_MAIN_SCREEN.includes(p.status))
-  const ownTasks = sortByOrder(
-    s.tasks.filter((t) => !t.done),
-    s.mainOrder.tasks,
+  // own tasks and all routines form one list, as on the tasks screen
+  type E = { id: string; owner: string | null; project?: Project } & (
+    | { kind: 'task'; text: string }
+    | { kind: 'routine'; routine: Routine }
   )
-  type R = { owner: string | null; routine: Routine; project?: Project }
-  const routines = sortByOrder(
+  const entries = sortByOrder(
     [
-      ...s.routines.map((r): R => ({ owner: null, routine: r })),
-      ...active.flatMap((p) => p.routines.map((r): R => ({ owner: p.id, routine: r, project: p }))),
-    ].map((e) => ({ ...e, id: e.routine.id })),
-    s.mainOrder.routines,
+      ...s.tasks.filter((t) => !t.done).map((t): E => ({ id: t.id, kind: 'task', owner: null, text: t.text })),
+      ...s.routines.map((r): E => ({ id: r.id, kind: 'routine', owner: null, routine: r })),
+      ...active.flatMap((p) => p.routines.map((r): E => ({ id: r.id, kind: 'routine', owner: p.id, routine: r, project: p }))),
+    ],
+    taskOrder(s.mainOrder),
   )
   // routines that are already done wait at the bottom
-  routines.sort((a, b) => Number(isDone(a.routine)) - Number(isDone(b.routine)))
+  const resting = (e: E) => e.kind === 'routine' && isDone(e.routine)
+  entries.sort((a, b) => Number(resting(a)) - Number(resting(b)))
 
   return (
     <div className="page picker">
@@ -238,16 +272,37 @@ function DayPicker({ today, onDone }: { today: string; onDone: () => void }) {
       <AddItem
         label="Новая задача"
         withSphere
-        onAdd={(text, sp) => s.planAdd({ id: s.addTask(null, text, sp), type: 'task', owner: null, text })}
+        withInterval="optional"
+        onAdd={(text, sp, interval) => {
+          const id = interval ? s.addRoutine(null, text, sp, interval) : s.addTask(null, text, sp)
+          s.planAdd({ id, type: interval ? 'routine' : 'task', owner: null, text })
+        }}
       />
-      {ownTasks.map((t) => (
-        <PickRow
-          key={t.id}
-          text={t.text}
-          selected={planned.has(t.id)}
-          onClick={() => toggle({ id: t.id, type: 'task', owner: null, text: t.text })}
-        />
-      ))}
+      {entries.map((e) => {
+        if (e.kind === 'task')
+          return (
+            <PickRow
+              key={e.id}
+              text={e.text}
+              selected={planned.has(e.id)}
+              onClick={() => toggle({ id: e.id, type: 'task', owner: null, text: e.text })}
+            />
+          )
+        const r = e.routine
+        const reopenAt = routineReopenAt(r, dayStartHour)
+        const done = reopenAt !== null && now < reopenAt
+        return (
+          <PickRow
+            key={r.id}
+            text={r.text}
+            selected={planned.has(r.id)}
+            done={done}
+            badge={e.project && <span className="badge">{e.project.title}</span>}
+            meta={done ? shortLeft(reopenAt - now) : r.interval !== 24 ? '↻' + intervalLabel(r.interval) : null}
+            onClick={() => toggle({ id: r.id, type: 'routine', owner: e.owner, text: r.text }, done)}
+          />
+        )
+      })}
 
       {active.map((p) => {
         const tasks = p.tasks.filter((t) => !t.done)
@@ -267,22 +322,6 @@ function DayPicker({ today, onDone }: { today: string; onDone: () => void }) {
         )
       })}
 
-      {routines.length > 0 && <h3>Рутина</h3>}
-      {routines.map(({ routine: r, owner, project }) => {
-        const reopenAt = routineReopenAt(r, dayStartHour)
-        const done = reopenAt !== null && now < reopenAt
-        return (
-          <PickRow
-            key={r.id}
-            text={r.text}
-            selected={planned.has(r.id)}
-            done={done}
-            badge={project && <span className="badge">{project.title}</span>}
-            meta={done ? shortLeft(reopenAt - now) : r.interval !== 24 ? '↻' + intervalLabel(r.interval) : null}
-            onClick={() => toggle({ id: r.id, type: 'routine', owner, text: r.text }, done)}
-          />
-        )
-      })}
     </div>
   )
 }

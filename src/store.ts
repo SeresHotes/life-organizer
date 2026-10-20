@@ -122,8 +122,9 @@ export type Data = {
   dayStartHour: number
   /**
    * Order of the mixed main-screen lists (own items + items coming from projects).
-   * tasks: own task ids and `project:<id>` slots (a project's slot shows its first open task);
-   * routines: routine ids (own and projects').
+   * tasks: own task ids, `project:<id>` slots (a project's slot shows its first open task) and routine ids
+   * (own and projects') — tasks and routines are one list;
+   * routines: the old separate routine order, used for routines not yet placed in `tasks` (see taskOrder).
    */
   mainOrder: { tasks: string[]; routines: string[] }
   /** Day plans by day key (YYYY-MM-DD). Nothing carries over: each day is planned anew. */
@@ -200,6 +201,12 @@ const initialData: Data = {
 export function sortByOrder<T extends { id: string }>(items: T[], order: string[]): T[] {
   const pos = new Map(order.map((k, i) => [k, i]))
   return [...items].sort((a, b) => (pos.get(a.id) ?? -1) - (pos.get(b.id) ?? -1))
+}
+
+/** Order of the combined tasks + routines list; routines never placed in it yet keep their old order after the tasks. */
+export function taskOrder(order: State['mainOrder']) {
+  const known = new Set(order.tasks)
+  return [...order.tasks, ...order.routines.filter((k) => !known.has(k))]
 }
 
 /** Moves `activeId` to the place of `overId`. */
@@ -422,8 +429,9 @@ export const useStore = create<State>()(
             const byPos = <T extends { id: string }>(a: T, b: T) => (pos.get(a.id) ?? -1) - (pos.get(b.id) ?? -1)
             const mainOrder = { ...s.mainOrder, [list]: keys }
             if (list === 'tasks') {
+              // the tasks list holds routines too
               const open = s.tasks.filter((t) => !t.done).sort(byPos)
-              return { mainOrder, tasks: [...open, ...s.tasks.filter((t) => t.done)] }
+              return { mainOrder, tasks: [...open, ...s.tasks.filter((t) => t.done)], routines: [...s.routines].sort(byPos) }
             }
             return { mainOrder, routines: [...s.routines].sort(byPos) }
           }),
