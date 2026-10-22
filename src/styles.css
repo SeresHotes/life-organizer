@@ -153,8 +153,9 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
   border-radius: 12px;
   padding: 6px;
 }
-.today-actions { display: flex; gap: 8px; flex: none; }
-.today-actions button { flex: 1; padding: 10px 8px; border-radius: 10px; }
+.today-actions { display: flex; gap: 6px; flex: none; }
+.today-actions button { flex: 1 1 0; min-width: 0; padding: 10px 2px; border-radius: 10px; white-space: nowrap; font-size: 0.9rem; }
+@media (max-width: 350px) { .today-actions button { font-size: 0.8rem; } }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .empty { color: var(--muted); text-align: center; padding: 24px 12px; margin: 0; }
 .flash { color: var(--ok); font-size: 0.85rem; padding: 2px 8px 6px; }

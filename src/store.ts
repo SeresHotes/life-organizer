@@ -42,6 +42,12 @@ export function shortLeft(ms: number) {
   if (ms >= HOUR) return `${Math.ceil(ms / HOUR)}ч`
   return `${Math.max(1, Math.ceil(ms / 60000))}м`
 }
+/** Label of a routine: its period, plus the time until it opens again if it's done. */
+export function routineMeta(r: Routine, now: number, dayStartHour: number) {
+  const reopenAt = routineReopenAt(r, dayStartHour)
+  const period = '↻' + intervalLabel(r.interval)
+  return reopenAt !== null && now < reopenAt ? `${period} · ${shortLeft(reopenAt - now)}` : period
+}
 export type Status = 'open' | 'backlog' | 'progress' | 'waiting' | 'done'
 export type Sphere = { id: string; name: string; color: string }
 export type Project = {

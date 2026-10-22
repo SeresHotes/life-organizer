@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ON_MAIN_SCREEN, dayKey, intervalLabel, routineReopenAt, shortLeft, sortByOrder, taskOrder, useStore, type PlanItem, type Project, type Routine, type State } from '../store'
+import { ON_MAIN_SCREEN, dayKey, intervalLabel, routineMeta, routineReopenAt, sortByOrder, taskOrder, useStore, type PlanItem, type Project, type Routine, type State } from '../store'
 import { useNow, useRoutineDone } from '../hooks'
 import { SortableList } from '../components/SortableList'
 import { AddForm, AddItem } from '../components/AddItem'
@@ -12,7 +12,7 @@ export function MainScreen() {
   const now = useNow()
   const today = dayKey(s.dayStartHour, new Date(now))
   const [viewed, setViewed] = useState<string | null>(null)
-  const [adding, setAdding] = useState<'task' | 'thought' | null>(null)
+  const [adding, setAdding] = useState<'today' | 'task' | 'thought' | null>(null)
   const [picking, setPicking] = useState(false)
   const [flash, setFlash] = useState('')
   useEffect(() => {
@@ -59,7 +59,7 @@ export function MainScreen() {
       </div>
 
       <div className="today-list">
-        {adding === 'task' && (
+        {adding === 'today' && (
           <AddForm
             label="Задача на сегодня"
             withSphere
@@ -67,6 +67,19 @@ export function MainScreen() {
             onAdd={(text, sp, interval) => {
               const id = interval ? s.addRoutine(null, text, sp, interval) : s.addTask(null, text, sp)
               s.planAdd({ id, type: interval ? 'routine' : 'task', owner: null, text })
+            }}
+            onClose={() => setAdding(null)}
+          />
+        )}
+        {adding === 'task' && (
+          <AddForm
+            label="Задача в общий список"
+            withSphere
+            withInterval="optional"
+            onAdd={(text, sp, interval) => {
+              if (interval) s.addRoutine(null, text, sp, interval)
+              else s.addTask(null, text, sp)
+              setFlash('Задача добавлена в список')
             }}
             onClose={() => setAdding(null)}
           />
@@ -105,9 +118,10 @@ export function MainScreen() {
       <div className="today-actions">
         {isToday ? (
           <>
-            <button className="primary" onClick={() => setAdding('task')}>
-              + На сегодня
+            <button className="primary" onClick={() => setAdding('today')}>
+              + Сегодня
             </button>
+            <button onClick={() => setAdding('task')}>+ Задача</button>
             <button onClick={() => setAdding('thought')}>+ Мысль</button>
             <button onClick={() => setPicking(true)}>☰ Выбрать</button>
           </>
@@ -166,7 +180,7 @@ function useSource(item: PlanItem) {
   return useStore((s: State) => {
     const owner = item.owner === null ? s : s.projects.find((p) => p.id === item.owner)
     const list = item.type === 'task' ? owner?.tasks : owner?.routines
-    return (list as { id: string; text: string; sphereId: string | null; done?: boolean }[] | undefined)?.find((x) => x.id === item.id)
+    return (list as { id: string; text: string; sphereId: string | null; done?: boolean; interval?: number }[] | undefined)?.find((x) => x.id === item.id)
   })
 }
 
@@ -184,7 +198,7 @@ function PlanRow({ item }: { item: PlanItem }) {
       text={item.text}
       done={item.done}
       badge={project && <ProjectBadge project={project} />}
-      meta={item.type === 'routine' ? '↻' : null}
+      meta={item.type === 'routine' ? '↻' + (source?.interval ? intervalLabel(source.interval) : '') : null}
       sphereId={item.owner === null ? (source?.sphereId ?? null) : null}
       onToggle={() => s.planToggleDone(item.id)}
       onSave={(text) => {
@@ -298,7 +312,7 @@ function DayPicker({ today, onDone }: { today: string; onDone: () => void }) {
             selected={planned.has(r.id)}
             done={done}
             badge={e.project && <span className="badge">{e.project.title}</span>}
-            meta={done ? shortLeft(reopenAt - now) : r.interval !== 24 ? '↻' + intervalLabel(r.interval) : null}
+            meta={routineMeta(r, now, dayStartHour)}
             onClick={() => toggle({ id: r.id, type: 'routine', owner: e.owner, text: r.text }, done)}
           />
         )

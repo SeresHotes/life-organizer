@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { intervalLabel, routineReopenAt, shortLeft, useStore, type Note, type NoteKind, type Owner, type Project, type Routine, type Task } from '../store'
+import { routineMeta, routineReopenAt, useStore, type Note, type NoteKind, type Owner, type Project, type Routine, type Task } from '../store'
 import { navigate, useRoutineDone } from '../hooks'
 import { SortableList } from './SortableList'
 import { IntervalChips, ItemRow } from './ItemRow'
@@ -61,7 +61,7 @@ export function RoutineRow({ owner, routine: r, badge }: { owner: Owner; routine
       text={r.text}
       done={done}
       badge={badge}
-      meta={done ? shortLeft(reopenAt - now) : r.interval !== 24 ? '↻' + intervalLabel(r.interval) : null}
+      meta={routineMeta(r, now, dayStartHour)}
       editExtra={<IntervalChips value={r.interval} onChange={(interval) => s.updateRoutine(owner, r.id, { interval })} />}
       sphereId={owner === null ? r.sphereId : null}
       onSphere={owner === null ? (sphereId) => s.updateRoutine(owner, r.id, { sphereId }) : undefined}
